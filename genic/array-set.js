@@ -36,32 +36,59 @@ function test(times) {
     console.warn(b)
     console.warn(c)
     console.warn(d)
-    setTimeout(()=>{
+    //get last
+    let last
+    console.time('set getLast')
+    for (let i = 0; i < times; i++) {
+       last= (()=>{
+           let count=0,target=a.size-1
+           for(const i of a.values()){
+               if(count==target)return i
+               count++
+           }
+        })()
+        
+    }
+    console.timeEnd('set getLast')
+    console.log(last)
+    //array
+    console.time('array getLast')
+    for (let i = 0; i < times; i++) {
+       last= (()=>{
+            
+        return b[b.length-1]
+        })()
+        
+    }
+    console.timeEnd('array getLast')
+    console.log(last)
+    //
+    setTimeout(() => {
         console.time('set delete')
-    for (let i = 0; i < times; i++) {
-        a.delete(i)
-    }
-    console.timeEnd('set delete')
+        for (let i = 0; i < times; i++) {
+            a.delete(i)
+        }
+        console.timeEnd('set delete')
 
-    console.time('array pop')
-    for (let i = 0; i < times; i++) {
-        b.pop()
-    }
-    console.timeEnd('array pop')
+        console.time('array pop')
+        for (let i = 0; i < times; i++) {
+            b.pop()
+        }
+        console.timeEnd('array pop')
 
-    console.time('array shift')
-    for (let i = 0; i < times; i++) {
-        c.shift()
-    }
-    console.timeEnd('array shift')
+        console.time('array shift')
+        for (let i = 0; i < times; i++) {
+            c.shift()
+        }
+        console.timeEnd('array shift')
 
-    /* console.time('array [i]=i')
-    for (let i = 0; i < times; i++) {
-        d[i] = i
-    }
-    console.timeEnd('array [i]=i') */
+        /* console.time('array [i]=i')
+        for (let i = 0; i < times; i++) {
+            d[i] = i
+        }
+        console.timeEnd('array [i]=i') */
 
-    },200)
+    }, 200)
 }
 /* test(100000)
 VM228:10 set add: 9.45703125ms
