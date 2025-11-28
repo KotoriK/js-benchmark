@@ -16,6 +16,9 @@ Serializes data to JSON string in C++ using [yyjson](https://github.com/ibireme/
 ### 4. MessagePack (msgpack-c + memory access)
 Serializes data to MessagePack binary in C++ using [msgpack-c](https://github.com/msgpack/msgpack-c), transfers via direct WASM memory access using `HEAPU8`, then decodes in JavaScript using [@msgpack/msgpack](https://github.com/msgpack/msgpack-javascript).
 
+### 5. typed-cstruct (raw C struct + memory access)
+Exposes raw C struct binary data in WASM memory (pointer address), JavaScript reads binary data via `HEAPU8`, then parses using [typed-cstruct](https://github.com/ssssota/typed-cstruct). This approach avoids serialization overhead by directly reading the struct layout.
+
 ## Prerequisites
 
 - [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) (emcc, emcmake)
@@ -96,14 +99,15 @@ wasm/
 └── src/
     ├── benchmark_embind.cpp    # embind implementation (value_object + manual val)
     ├── benchmark_json.cpp      # JSON/yyjson implementation (memory access)
-    └── benchmark_msgpack.cpp   # MessagePack/msgpack-c implementation (memory access)
+    ├── benchmark_msgpack.cpp   # MessagePack/msgpack-c implementation (memory access)
+    └── benchmark_cstruct.cpp   # typed-cstruct implementation (raw C struct memory access)
 ```
 
 ## Key Design Decisions
 
 - **Data flow**: C++ → JS (not JS → C++)
 - **embind tests both**: `value_object` AND manual `val::set()`
-- **JSON/MessagePack**: Use preamble.js APIs (`UTF8ToString`, `HEAPU8`) for direct memory access, not embind
+- **JSON/MessagePack/typed-cstruct**: Use preamble.js APIs (`UTF8ToString`, `HEAPU8`) for direct memory access, not embind
 
 ## Dependencies
 
@@ -113,6 +117,7 @@ C++ dependencies managed via CMake FetchContent:
 
 JavaScript dependencies:
 - **@msgpack/msgpack** - MessagePack decoder for JavaScript
+- **typed-cstruct** - C struct binary parser for JavaScript
 
 ## Results Interpretation
 

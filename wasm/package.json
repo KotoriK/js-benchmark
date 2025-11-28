@@ -2,7 +2,7 @@
   "name": "wasm-benchmark",
   "version": "1.0.0",
   "type": "module",
-  "description": "WebAssembly Data Transfer Benchmark - Comparing embind, JSON (yyjson), and MessagePack",
+  "description": "WebAssembly Data Transfer Benchmark - Comparing embind, JSON (yyjson), MessagePack, and typed-cstruct",
   "main": "benchmark.mjs",
   "scripts": {
     "build": "mkdir -p build && cd build && emcmake cmake .. && emmake make",
@@ -16,7 +16,8 @@
     "benchmark",
     "embind",
     "json",
-    "messagepack"
+    "messagepack",
+    "typed-cstruct"
   ],
   "dependencies": {
     "@msgpack/msgpack": "^3.0.0",
