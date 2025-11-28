@@ -1,5 +1,6 @@
 # Build output
 build/
+_codeql_build_dir/
 
 # Node.js dependencies
 node_modules/
@@ -10,3 +11,6 @@ node_modules/
 
 # System files
 .DS_Store
+
+# CodeQL artifacts
+_codeql_detected_source_root

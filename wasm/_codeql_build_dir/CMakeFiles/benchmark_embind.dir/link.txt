@@ -1,1 +1,0 @@
-/home/runner/work/js-benchmark/.codeql-scratch/dbs/cpp/working/autobuild/bin/c++ -O3 -DNDEBUG -sENVIRONMENT=node -sMODULARIZE=1 -sALLOW_MEMORY_GROWTH=1 -O3 -sEXPORT_NAME=createEmbindModule -Wl,--dependency-file=CMakeFiles/benchmark_embind.dir/link.d CMakeFiles/benchmark_embind.dir/src/benchmark_embind.cpp.o -o benchmark_embind.cjs  -lembind
