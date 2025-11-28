@@ -16,6 +16,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(yyjson)
 
+# Fetch msgpack-c (header-only C++ library)
+FetchContent_Declare(
+    msgpack-c
+    GIT_REPOSITORY https://github.com/msgpack/msgpack-c.git
+    GIT_TAG cpp-6.1.1
+)
+# msgpack-c is header-only for C++, just need the headers
+FetchContent_GetProperties(msgpack-c)
+if(NOT msgpack-c_POPULATED)
+    FetchContent_Populate(msgpack-c)
+endif()
+
 # Common emscripten settings
 set(EMSCRIPTEN_COMMON_FLAGS
     "-sENVIRONMENT=node"
@@ -50,8 +62,10 @@ target_link_options(benchmark_json PRIVATE
     "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','cwrap']"
 )
 
-# MessagePack benchmark module - uses direct memory access, NO embind
+# MessagePack benchmark module - uses msgpack-c, direct memory access, NO embind
 add_executable(benchmark_msgpack src/benchmark_msgpack.cpp)
+target_include_directories(benchmark_msgpack PRIVATE ${msgpack-c_SOURCE_DIR}/include)
+target_compile_definitions(benchmark_msgpack PRIVATE MSGPACK_NO_BOOST)
 set_target_properties(benchmark_msgpack PROPERTIES
     OUTPUT_NAME "benchmark_msgpack"
     SUFFIX ".cjs"

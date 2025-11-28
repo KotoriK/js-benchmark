@@ -13,8 +13,8 @@ Uses `emscripten::val` to manually construct JavaScript objects in C++ code.
 ### 3. JSON (yyjson + memory access)
 Serializes data to JSON string in C++ using [yyjson](https://github.com/ibireme/yyjson), transfers via direct WASM memory access using `UTF8ToString()` from preamble.js, then parses in JavaScript.
 
-### 4. MessagePack (memory access)
-Serializes data to MessagePack binary in C++ using a lightweight implementation, transfers via direct WASM memory access using `HEAPU8`, then decodes in JavaScript using [@msgpack/msgpack](https://github.com/msgpack/msgpack-javascript).
+### 4. MessagePack (msgpack-c + memory access)
+Serializes data to MessagePack binary in C++ using [msgpack-c](https://github.com/msgpack/msgpack-c), transfers via direct WASM memory access using `HEAPU8`, then decodes in JavaScript using [@msgpack/msgpack](https://github.com/msgpack/msgpack-javascript).
 
 ## Prerequisites
 
@@ -47,6 +47,19 @@ npm run benchmark
 # Or with custom iterations:
 ITERATIONS=500 node benchmark.mjs
 ```
+
+## GitHub Actions
+
+This repository includes GitHub Actions workflows to:
+- **Build and run benchmarks** automatically on push/PR
+- **Publish results to GitHub Pages** for easy viewing
+
+The workflow runs on:
+- Push to main/master branch
+- Pull requests
+- Manual trigger (workflow_dispatch)
+
+Results are available at: `https://<username>.github.io/<repo>/`
 
 ## Benchmark Tests
 
@@ -83,10 +96,10 @@ wasm/
 └── src/
     ├── benchmark_embind.cpp    # embind implementation (value_object + manual val)
     ├── benchmark_json.cpp      # JSON/yyjson implementation (memory access)
-    └── benchmark_msgpack.cpp   # MessagePack implementation (memory access)
+    └── benchmark_msgpack.cpp   # MessagePack/msgpack-c implementation (memory access)
 ```
 
-## Key Differences from Previous Implementation
+## Key Design Decisions
 
 - **Data flow**: C++ → JS (not JS → C++)
 - **embind tests both**: `value_object` AND manual `val::set()`
@@ -96,6 +109,7 @@ wasm/
 
 C++ dependencies managed via CMake FetchContent:
 - **yyjson** v0.10.0 - High-performance JSON library for C
+- **msgpack-c** cpp-6.1.1 - MessagePack implementation for C++ (header-only)
 
 JavaScript dependencies:
 - **@msgpack/msgpack** - MessagePack decoder for JavaScript
