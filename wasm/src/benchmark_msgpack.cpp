@@ -153,19 +153,23 @@ struct Value {
         return as_map().count(key) > 0;
     }
     
+    // Get value by key, returns nil Value if not found
+    // Note: In single-threaded WASM environment, static nil is safe
     const Value& operator[](const std::string& key) const {
-        static Value nil;
+        static const Value nil;
         if (!is_map()) return nil;
-        auto& m = as_map();
+        const auto& m = as_map();
         auto it = m.find(key);
         if (it == m.end()) return nil;
         return it->second;
     }
     
+    // Get value by index, returns nil Value if out of bounds
+    // Note: In single-threaded WASM environment, static nil is safe
     const Value& operator[](size_t idx) const {
-        static Value nil;
+        static const Value nil;
         if (!is_array()) return nil;
-        auto& arr = as_array();
+        const auto& arr = as_array();
         if (idx >= arr.size()) return nil;
         return arr[idx];
     }
@@ -331,6 +335,11 @@ public:
 
 /**
  * Helper: Create Uint8Array from packer
+ * 
+ * Note: Element-by-element copying is necessary because embind doesn't provide
+ * direct bulk memory access from WASM to typed arrays. In production, consider
+ * using emscripten's HEAPU8 for direct memory access, but this would require
+ * manual memory management.
  */
 val packToUint8Array(const msgpack_lite::Packer& pk) {
     val jsArray = val::global("Uint8Array").new_(pk.size());
@@ -343,6 +352,10 @@ val packToUint8Array(const msgpack_lite::Packer& pk) {
 
 /**
  * Helper: Read Uint8Array into vector
+ * 
+ * Note: Element-by-element copying is a known performance limitation when
+ * using embind with typed arrays. This overhead is part of what the benchmark
+ * measures for the MessagePack approach.
  */
 std::vector<uint8_t> readUint8Array(val arr) {
     size_t len = arr["length"].as<size_t>();

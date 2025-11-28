@@ -27,16 +27,24 @@ std::string processFlat(const std::string& jsonStr) {
     yyjson_mut_val *result = yyjson_mut_obj(mut_doc);
     yyjson_mut_doc_set_root(mut_doc, result);
     
-    // Copy fields and add processed flag
+    // Copy fields with type checking and add processed flag
     yyjson_val *id = yyjson_obj_get(root, "id");
     yyjson_val *name = yyjson_obj_get(root, "name");
     yyjson_val *value = yyjson_obj_get(root, "value");
     yyjson_val *flag = yyjson_obj_get(root, "flag");
     
-    if (id) yyjson_mut_obj_add_int(mut_doc, result, "id", yyjson_get_int(id));
-    if (name) yyjson_mut_obj_add_strcpy(mut_doc, result, "name", yyjson_get_str(name));
-    if (value) yyjson_mut_obj_add_real(mut_doc, result, "value", yyjson_get_real(value));
-    if (flag) yyjson_mut_obj_add_bool(mut_doc, result, "flag", yyjson_get_bool(flag));
+    if (id && yyjson_is_int(id)) {
+        yyjson_mut_obj_add_int(mut_doc, result, "id", yyjson_get_int(id));
+    }
+    if (name && yyjson_is_str(name)) {
+        yyjson_mut_obj_add_strcpy(mut_doc, result, "name", yyjson_get_str(name));
+    }
+    if (value && (yyjson_is_real(value) || yyjson_is_int(value))) {
+        yyjson_mut_obj_add_real(mut_doc, result, "value", yyjson_get_num(value));
+    }
+    if (flag && yyjson_is_bool(flag)) {
+        yyjson_mut_obj_add_bool(mut_doc, result, "flag", yyjson_get_bool(flag));
+    }
     yyjson_mut_obj_add_bool(mut_doc, result, "processed", true);
     
     char *json = yyjson_mut_write(mut_doc, 0, nullptr);

@@ -5,7 +5,7 @@
   "description": "WebAssembly Data Transfer Benchmark - Comparing embind, JSON (yyjson), and MessagePack",
   "main": "benchmark.mjs",
   "scripts": {
-    "build": "mkdir -p build && cd build && emcmake cmake .. && emmake make -j$(nproc)",
+    "build": "mkdir -p build && cd build && emcmake cmake .. && emmake make",
     "build:clean": "rm -rf build && npm run build",
     "benchmark": "node benchmark.mjs",
     "test": "node benchmark.mjs"
