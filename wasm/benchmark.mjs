@@ -51,13 +51,13 @@ class Benchmark {
             times.push(end - start);
         }
 
-        const sorted = times.slice().sort((a, b) => a - b);
+        times.sort((a, b) => a - b);
         return {
-            min: sorted[0],
-            max: sorted[sorted.length - 1],
+            min: times[0],
+            max: times[times.length - 1],
             avg: times.reduce((a, b) => a + b, 0) / times.length,
-            median: sorted[Math.floor(sorted.length / 2)],
-            p95: sorted[Math.floor(sorted.length * 0.95)]
+            median: times[Math.floor(times.length / 2)],
+            p95: times[Math.floor(times.length * 0.95)]
         };
     }
 

@@ -41,7 +41,7 @@ public:
             buffer.push_back(0xd1);
             buffer.push_back(static_cast<uint8_t>((v >> 8) & 0xff));
             buffer.push_back(static_cast<uint8_t>(v & 0xff));
-        } else if (v >= -2147483648LL && v <= 2147483647LL) {
+        } else if (v >= INT32_MIN && v <= INT32_MAX) {
             buffer.push_back(0xd2);
             buffer.push_back(static_cast<uint8_t>((v >> 24) & 0xff));
             buffer.push_back(static_cast<uint8_t>((v >> 16) & 0xff));
