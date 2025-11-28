@@ -1,0 +1,343 @@
+name: WASM Benchmark
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'wasm/**'
+      - '.github/workflows/wasm-benchmark.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'wasm/**'
+      - '.github/workflows/wasm-benchmark.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-benchmark:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 'latest'
+
+      - name: Verify Emscripten
+        run: emcc --version
+
+      - name: Install Node.js dependencies
+        working-directory: ./wasm
+        run: npm ci
+
+      - name: Build WASM modules
+        working-directory: ./wasm
+        run: |
+          mkdir -p build
+          cd build
+          emcmake cmake ..
+          emmake make -j$(nproc)
+
+      - name: Run benchmarks
+        id: benchmark
+        working-directory: ./wasm
+        run: |
+          # Run benchmark with 200 iterations for stable results
+          ITERATIONS=200 node benchmark.mjs > benchmark-output.txt 2>&1
+          cat benchmark-output.txt
+          
+          # Create JSON output for GitHub Pages
+          node -e "
+          const fs = require('fs');
+          const output = fs.readFileSync('benchmark-output.txt', 'utf8');
+          
+          const results = {
+            timestamp: new Date().toISOString(),
+            commit: process.env.GITHUB_SHA || 'local',
+            ref: process.env.GITHUB_REF || 'local',
+            iterations: 200,
+            rawOutput: output,
+            benchmarks: []
+          };
+          
+          // Parse benchmark results
+          const lines = output.split('\n');
+          let currentBenchmark = null;
+          let currentTestName = 'unknown';
+          let inResults = false;
+          
+          for (const line of lines) {
+            if (line.startsWith('Benchmark Results:')) {
+              currentBenchmark = {
+                name: line.replace('Benchmark Results:', '').trim(),
+                tests: []
+              };
+              results.benchmarks.push(currentBenchmark);
+              inResults = false;
+              currentTestName = 'unknown';
+            } else if (line.includes('Method') && line.includes('Avg')) {
+              inResults = true;
+            } else if (line.endsWith(':') && !line.includes('Benchmark') && !line.startsWith('-') && !line.startsWith('=')) {
+              // This is a test name line (e.g., 'flat_nameLen10:')
+              currentTestName = line.replace(':', '').trim();
+              inResults = false;
+            } else if (inResults && line.trim() && !line.startsWith('-') && !line.startsWith('=')) {
+              const parts = line.trim().split(/\s+/);
+              if (parts.length >= 5) {
+                const method = parts[0];
+                const avg = parseFloat(parts[1]);
+                const median = parseFloat(parts[2]);
+                const min = parseFloat(parts[3]);
+                const p95 = parseFloat(parts[4]);
+                
+                if (!isNaN(avg) && currentBenchmark) {
+                  currentBenchmark.tests.push({
+                    test: currentTestName,
+                    method: method,
+                    avg: avg,
+                    median: median,
+                    min: min,
+                    p95: p95
+                  });
+                }
+              }
+            }
+          }
+          
+          fs.writeFileSync('benchmark-results.json', JSON.stringify(results, null, 2));
+          console.log('Results saved to benchmark-results.json');
+          "
+
+      - name: Upload benchmark artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            wasm/benchmark-output.txt
+            wasm/benchmark-results.json
+
+      - name: Generate GitHub Pages content
+        run: |
+          mkdir -p public
+          
+          # Copy benchmark results
+          cp wasm/benchmark-results.json public/
+          cp wasm/benchmark-output.txt public/
+          
+          # Create index.html
+          cat > public/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>WASM Benchmark Results</title>
+            <style>
+              :root {
+                --bg-color: #1a1a2e;
+                --card-bg: #16213e;
+                --text-color: #eaeaea;
+                --accent-color: #0f3460;
+                --highlight: #e94560;
+              }
+              
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+                background: var(--bg-color);
+                color: var(--text-color);
+                margin: 0;
+                padding: 20px;
+                line-height: 1.6;
+              }
+              
+              .container {
+                max-width: 1200px;
+                margin: 0 auto;
+              }
+              
+              h1 {
+                color: var(--highlight);
+                border-bottom: 2px solid var(--highlight);
+                padding-bottom: 10px;
+              }
+              
+              h2 {
+                color: var(--text-color);
+                margin-top: 30px;
+              }
+              
+              .info {
+                background: var(--card-bg);
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+              }
+              
+              .info p {
+                margin: 5px 0;
+              }
+              
+              .benchmark-section {
+                background: var(--card-bg);
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+              }
+              
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 15px;
+              }
+              
+              th, td {
+                padding: 12px;
+                text-align: left;
+                border-bottom: 1px solid var(--accent-color);
+              }
+              
+              th {
+                background: var(--accent-color);
+                color: white;
+              }
+              
+              tr:hover {
+                background: rgba(233, 69, 96, 0.1);
+              }
+              
+              .method-embind_value_object { color: #4ecdc4; }
+              .method-embind_manual_val { color: #45b7d1; }
+              .method-json_memory_access { color: #f7dc6f; }
+              .method-msgpack_memory_access { color: #bb8fce; }
+              
+              .raw-output {
+                background: #0d1117;
+                padding: 20px;
+                border-radius: 8px;
+                overflow-x: auto;
+                font-family: 'Courier New', monospace;
+                font-size: 13px;
+                white-space: pre;
+                max-height: 600px;
+                overflow-y: auto;
+              }
+              
+              .legend {
+                display: flex;
+                gap: 20px;
+                flex-wrap: wrap;
+                margin: 20px 0;
+              }
+              
+              .legend-item {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+              }
+              
+              .legend-color {
+                width: 20px;
+                height: 20px;
+                border-radius: 4px;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <h1>🚀 WebAssembly Data Transfer Benchmark</h1>
+              
+              <div class="info">
+                <p><strong>Description:</strong> Comparing methods of transferring data from C++ (WASM VM) to JavaScript</p>
+                <p id="timestamp"></p>
+                <p id="commit"></p>
+              </div>
+              
+              <div class="legend">
+                <div class="legend-item">
+                  <div class="legend-color" style="background: #4ecdc4;"></div>
+                  <span>embind_value_object</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color" style="background: #45b7d1;"></div>
+                  <span>embind_manual_val</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color" style="background: #f7dc6f;"></div>
+                  <span>json_memory_access (yyjson)</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color" style="background: #bb8fce;"></div>
+                  <span>msgpack_memory_access (msgpack-c)</span>
+                </div>
+              </div>
+              
+              <div id="benchmarks"></div>
+              
+              <h2>📋 Raw Output</h2>
+              <div class="raw-output" id="rawOutput"></div>
+            </div>
+            
+            <script>
+              fetch('benchmark-results.json')
+                .then(res => res.json())
+                .then(data => {
+                  document.getElementById('timestamp').innerHTML = 
+                    '<strong>Run at:</strong> ' + new Date(data.timestamp).toLocaleString();
+                  document.getElementById('commit').innerHTML = 
+                    '<strong>Commit:</strong> ' + data.commit.substring(0, 8);
+                  document.getElementById('rawOutput').textContent = data.rawOutput;
+                })
+                .catch(err => {
+                  console.error('Failed to load results:', err);
+                  document.getElementById('benchmarks').innerHTML = 
+                    '<p>Failed to load benchmark results. Check console for details.</p>';
+                });
+              
+              fetch('benchmark-output.txt')
+                .then(res => res.text())
+                .then(text => {
+                  document.getElementById('rawOutput').textContent = text;
+                });
+            </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./public
+
+  deploy:
+    needs: build-and-benchmark
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

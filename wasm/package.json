@@ -1,0 +1,27 @@
+{
+  "name": "wasm-benchmark",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "WebAssembly Data Transfer Benchmark - Comparing embind, JSON (yyjson), and MessagePack",
+  "main": "benchmark.mjs",
+  "scripts": {
+    "build": "mkdir -p build && cd build && emcmake cmake .. && emmake make",
+    "build:clean": "rm -rf build && npm run build",
+    "benchmark": "node benchmark.mjs",
+    "test": "node benchmark.mjs"
+  },
+  "keywords": [
+    "wasm",
+    "webassembly",
+    "benchmark",
+    "embind",
+    "json",
+    "messagepack"
+  ],
+  "dependencies": {
+    "@msgpack/msgpack": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
