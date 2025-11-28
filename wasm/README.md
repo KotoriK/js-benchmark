@@ -1,10 +1,20 @@
 # WebAssembly Data Transfer Benchmark
 
-This benchmark compares three methods of transferring complex object data between WebAssembly VM and JavaScript:
+This benchmark compares methods of transferring complex object data **FROM C++ (WASM VM) TO JavaScript**.
 
-1. **embind** - Using `emscripten::val` for automatic type conversion
-2. **JSON** - Serializing/deserializing via [yyjson](https://github.com/ibireme/yyjson)
-3. **MessagePack** - Binary serialization via a lightweight custom implementation (msgpack-lite)
+## Methods Tested
+
+### 1. embind (value_object)
+Uses `emscripten::value_object` to register C++ structs for automatic type conversion to JavaScript.
+
+### 2. embind (manual val)  
+Uses `emscripten::val` to manually construct JavaScript objects in C++ code.
+
+### 3. JSON (yyjson + memory access)
+Serializes data to JSON string in C++ using [yyjson](https://github.com/ibireme/yyjson), transfers via direct WASM memory access using `UTF8ToString()` from preamble.js, then parses in JavaScript.
+
+### 4. MessagePack (memory access)
+Serializes data to MessagePack binary in C++ using a lightweight implementation, transfers via direct WASM memory access using `HEAPU8`, then decodes in JavaScript using [@msgpack/msgpack](https://github.com/msgpack/msgpack-javascript).
 
 ## Prerequisites
 
@@ -26,7 +36,7 @@ npm run build
 mkdir -p build
 cd build
 emcmake cmake ..
-emmake make -j$(nproc)
+emmake make
 ```
 
 ## Run Benchmark
@@ -40,27 +50,27 @@ ITERATIONS=500 node benchmark.mjs
 
 ## Benchmark Tests
 
-The benchmark tests various data transfer scenarios:
+The benchmark tests various data transfer scenarios (all data generated in C++):
 
-### 1. Flat Object Processing
-- Small, medium, and large objects with primitive types
+### 1. Flat Object
+- Objects with varying string lengths (10, 100, 1000 chars)
 - Tests basic serialization overhead
 
-### 2. Nested Object Processing
-- Objects with varying depths (2-4 levels)
-- Tests recursive structure handling
+### 2. Nested Object  
+- Objects with nested arrays of items (10, 50, 100 items)
+- Tests structure traversal overhead
 
-### 3. Number Array Processing
-- Arrays of 100, 1000, and 10000 numbers
+### 3. Number Array
+- Arrays of 100, 1000, 10000 numbers
 - Tests bulk numeric data transfer
 
-### 4. Object Array Processing
-- Arrays of 10, 100, and 500 objects
+### 4. Object Array
+- Arrays of 10, 100, 500 objects
 - Tests complex collection handling
 
-### 5. Complex Tree Operations
-- Creating and traversing nested tree structures
-- Tests recursive creation and counting
+### 5. Tree Structure
+- Recursive tree structures with varying depth and breadth
+- Tests deep nesting transfer
 
 ## Project Structure
 
@@ -71,46 +81,29 @@ wasm/
 ├── benchmark.mjs           # JavaScript benchmark runner
 ├── README.md               # This file
 └── src/
-    ├── benchmark_embind.cpp    # embind implementation
-    ├── benchmark_json.cpp      # JSON/yyjson implementation
-    └── benchmark_msgpack.cpp   # MessagePack implementation (with embedded msgpack-lite)
+    ├── benchmark_embind.cpp    # embind implementation (value_object + manual val)
+    ├── benchmark_json.cpp      # JSON/yyjson implementation (memory access)
+    └── benchmark_msgpack.cpp   # MessagePack implementation (memory access)
 ```
+
+## Key Differences from Previous Implementation
+
+- **Data flow**: C++ → JS (not JS → C++)
+- **embind tests both**: `value_object` AND manual `val::set()`
+- **JSON/MessagePack**: Use preamble.js APIs (`UTF8ToString`, `HEAPU8`) for direct memory access, not embind
 
 ## Dependencies
 
-Dependencies are managed via CMake FetchContent:
-
+C++ dependencies managed via CMake FetchContent:
 - **yyjson** v0.10.0 - High-performance JSON library for C
-- **@msgpack/msgpack** - JavaScript MessagePack library (for serialization on JS side)
 
-Note: The C++ MessagePack implementation uses a lightweight custom encoder/decoder
-(msgpack-lite) embedded in the source to avoid external Boost dependencies.
+JavaScript dependencies:
+- **@msgpack/msgpack** - MessagePack decoder for JavaScript
 
 ## Results Interpretation
 
-- **embind**: Most convenient API, automatic type conversion, excellent for small/simple objects
-- **JSON**: Text-based serialization, widely supported, good for structured data with yyjson's high performance
-- **MessagePack**: Binary format, smaller payload, but overhead from byte-by-byte array access
-
-The benchmark measures:
+The benchmark measures time for:
 - **Avg**: Average execution time
-- **Median**: 50th percentile execution time
+- **Median**: 50th percentile execution time  
 - **Min**: Minimum execution time
 - **P95**: 95th percentile execution time (captures tail latency)
-
-## Sample Results
-
-Based on Node.js v20 with Emscripten 3.1.6:
-
-| Test Case | embind (ms) | JSON (ms) | MessagePack (ms) |
-|-----------|-------------|-----------|------------------|
-| flat_small | 0.01 | 0.03 | 0.15 |
-| flat_large | 0.01 | 0.25 | 0.81 |
-| numbers_1000 | 0.21 | 0.24 | 2.66 |
-| objects_100 | 0.16 | 0.16 | 3.01 |
-| tree_d4_b3 | 0.29 | 0.11 | 2.20 |
-
-Key findings:
-- **embind** is fastest for most operations due to native V8 integration
-- **JSON (yyjson)** performs well for complex nested structures
-- **MessagePack** has higher overhead due to manual byte array handling in WASM

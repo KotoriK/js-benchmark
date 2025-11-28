@@ -1,251 +1,168 @@
 /**
  * @file benchmark_json.cpp
- * @brief WebAssembly benchmark using JSON with yyjson
+ * @brief WebAssembly benchmark using JSON for C++ to JS data transfer
  * 
- * This module demonstrates data transfer between JS and WASM using
- * JSON serialization/deserialization via the yyjson library.
+ * This module benchmarks data transfer FROM C++ (WASM) TO JavaScript using JSON.
+ * Data is serialized using yyjson in C++, then the raw JSON string is transferred
+ * to JavaScript via direct WASM memory access (preamble.js APIs).
+ * 
+ * JavaScript should use UTF8ToString() or similar to read the string from WASM memory.
  */
 
-#include <emscripten/bind.h>
-#include <emscripten/val.h>
+#include <emscripten.h>
 #include <string>
 #include <cstring>
+#include <cmath>
 #include "yyjson.h"
 
-using namespace emscripten;
+// ============================================================================
+// Data Generation and JSON Serialization
+// ============================================================================
 
 /**
- * Process a flat JSON object
+ * Result struct to return pointer and length to JS
  */
-std::string processFlat(const std::string& jsonStr) {
-    yyjson_doc *doc = yyjson_read(jsonStr.c_str(), jsonStr.length(), 0);
-    if (!doc) return "{}";
+struct StringResult {
+    const char* ptr;
+    size_t len;
+};
+
+// Global buffer for JSON output (to avoid memory management issues)
+static std::string g_json_buffer;
+
+/**
+ * Generate a flat object as JSON
+ */
+extern "C" {
+
+EMSCRIPTEN_KEEPALIVE
+const char* generateFlatJSON(int nameLen) {
+    yyjson_mut_doc *doc = yyjson_mut_doc_new(nullptr);
+    yyjson_mut_val *root = yyjson_mut_obj(doc);
+    yyjson_mut_doc_set_root(doc, root);
     
-    yyjson_val *root = yyjson_doc_get_root(doc);
+    yyjson_mut_obj_add_int(doc, root, "id", 42);
     
-    yyjson_mut_doc *mut_doc = yyjson_mut_doc_new(nullptr);
-    yyjson_mut_val *result = yyjson_mut_obj(mut_doc);
-    yyjson_mut_doc_set_root(mut_doc, result);
+    std::string name(nameLen, 'x');
+    yyjson_mut_obj_add_strcpy(doc, root, "name", name.c_str());
+    yyjson_mut_obj_add_real(doc, root, "value", 3.14159265359);
+    yyjson_mut_obj_add_bool(doc, root, "flag", true);
     
-    // Copy fields with type checking and add processed flag
-    yyjson_val *id = yyjson_obj_get(root, "id");
-    yyjson_val *name = yyjson_obj_get(root, "name");
-    yyjson_val *value = yyjson_obj_get(root, "value");
-    yyjson_val *flag = yyjson_obj_get(root, "flag");
-    
-    if (id && yyjson_is_int(id)) {
-        yyjson_mut_obj_add_int(mut_doc, result, "id", yyjson_get_int(id));
-    }
-    if (name && yyjson_is_str(name)) {
-        yyjson_mut_obj_add_strcpy(mut_doc, result, "name", yyjson_get_str(name));
-    }
-    if (value && (yyjson_is_real(value) || yyjson_is_int(value))) {
-        yyjson_mut_obj_add_real(mut_doc, result, "value", yyjson_get_num(value));
-    }
-    if (flag && yyjson_is_bool(flag)) {
-        yyjson_mut_obj_add_bool(mut_doc, result, "flag", yyjson_get_bool(flag));
-    }
-    yyjson_mut_obj_add_bool(mut_doc, result, "processed", true);
-    
-    char *json = yyjson_mut_write(mut_doc, 0, nullptr);
-    std::string resultStr(json);
+    char *json = yyjson_mut_write(doc, 0, nullptr);
+    g_json_buffer = json;
     free(json);
+    yyjson_mut_doc_free(doc);
     
-    yyjson_mut_doc_free(mut_doc);
-    yyjson_doc_free(doc);
-    
-    return resultStr;
+    return g_json_buffer.c_str();
 }
 
-/**
- * Process a nested JSON object
- */
-std::string processNested(const std::string& jsonStr) {
-    yyjson_doc *doc = yyjson_read(jsonStr.c_str(), jsonStr.length(), 0);
-    if (!doc) return "{}";
-    
-    yyjson_val *root = yyjson_doc_get_root(doc);
-    
-    yyjson_mut_doc *mut_doc = yyjson_mut_doc_new(nullptr);
-    yyjson_mut_val *result = yyjson_mut_obj(mut_doc);
-    yyjson_mut_doc_set_root(mut_doc, result);
-    
-    yyjson_mut_obj_add_str(mut_doc, result, "type", "nested");
-    
-    // Count items if nested structure exists
-    yyjson_val *data = yyjson_obj_get(root, "data");
-    if (data) {
-        yyjson_val *items = yyjson_obj_get(data, "items");
-        if (items && yyjson_is_arr(items)) {
-            size_t count = yyjson_arr_size(items);
-            yyjson_mut_obj_add_int(mut_doc, result, "itemCount", count);
-        }
-    }
-    
-    char *json = yyjson_mut_write(mut_doc, 0, nullptr);
-    std::string resultStr(json);
-    free(json);
-    
-    yyjson_mut_doc_free(mut_doc);
-    yyjson_doc_free(doc);
-    
-    return resultStr;
+EMSCRIPTEN_KEEPALIVE
+size_t getLastJSONLength() {
+    return g_json_buffer.length();
 }
 
-/**
- * Process a JSON array of numbers
- */
-std::string processNumberArray(const std::string& jsonStr) {
-    yyjson_doc *doc = yyjson_read(jsonStr.c_str(), jsonStr.length(), 0);
-    if (!doc) return "{}";
+EMSCRIPTEN_KEEPALIVE
+const char* generateNestedJSON(int itemCount) {
+    yyjson_mut_doc *doc = yyjson_mut_doc_new(nullptr);
+    yyjson_mut_val *root = yyjson_mut_obj(doc);
+    yyjson_mut_doc_set_root(doc, root);
     
-    yyjson_val *root = yyjson_doc_get_root(doc);
-    if (!yyjson_is_arr(root)) {
-        yyjson_doc_free(doc);
-        return "{}";
-    }
+    yyjson_mut_val *data = yyjson_mut_obj(doc);
+    yyjson_mut_val *items = yyjson_mut_arr(doc);
     
-    size_t len = yyjson_arr_size(root);
-    double sum = 0;
-    double min = 0, max = 0;
-    
-    if (len > 0) {
-        yyjson_val *first = yyjson_arr_get_first(root);
-        min = max = yyjson_get_num(first);
-    }
-    
-    size_t idx, max_idx;
-    yyjson_val *val;
-    yyjson_arr_foreach(root, idx, max_idx, val) {
-        double v = yyjson_get_num(val);
-        sum += v;
-        if (v < min) min = v;
-        if (v > max) max = v;
-    }
-    
-    yyjson_mut_doc *mut_doc = yyjson_mut_doc_new(nullptr);
-    yyjson_mut_val *result = yyjson_mut_obj(mut_doc);
-    yyjson_mut_doc_set_root(mut_doc, result);
-    
-    yyjson_mut_obj_add_int(mut_doc, result, "count", len);
-    yyjson_mut_obj_add_real(mut_doc, result, "sum", sum);
-    yyjson_mut_obj_add_real(mut_doc, result, "avg", len > 0 ? sum / len : 0);
-    yyjson_mut_obj_add_real(mut_doc, result, "min", min);
-    yyjson_mut_obj_add_real(mut_doc, result, "max", max);
-    
-    char *json = yyjson_mut_write(mut_doc, 0, nullptr);
-    std::string resultStr(json);
-    free(json);
-    
-    yyjson_mut_doc_free(mut_doc);
-    yyjson_doc_free(doc);
-    
-    return resultStr;
-}
-
-/**
- * Process a JSON array of objects
- */
-std::string processObjectArray(const std::string& jsonStr) {
-    yyjson_doc *doc = yyjson_read(jsonStr.c_str(), jsonStr.length(), 0);
-    if (!doc) return "[]";
-    
-    yyjson_val *root = yyjson_doc_get_root(doc);
-    if (!yyjson_is_arr(root)) {
-        yyjson_doc_free(doc);
-        return "[]";
-    }
-    
-    yyjson_mut_doc *mut_doc = yyjson_mut_doc_new(nullptr);
-    yyjson_mut_val *results = yyjson_mut_arr(mut_doc);
-    yyjson_mut_doc_set_root(mut_doc, results);
-    
-    size_t idx, max_idx;
-    yyjson_val *val;
-    yyjson_arr_foreach(root, idx, max_idx, val) {
-        yyjson_val *id = yyjson_obj_get(val, "id");
+    for (int i = 0; i < itemCount; i++) {
+        yyjson_mut_val *item = yyjson_mut_obj(doc);
+        yyjson_mut_obj_add_int(doc, item, "id", i);
         
-        yyjson_mut_val *item = yyjson_mut_obj(mut_doc);
-        if (id) yyjson_mut_obj_add_int(mut_doc, item, "originalId", yyjson_get_int(id));
-        yyjson_mut_obj_add_bool(mut_doc, item, "processed", true);
-        yyjson_mut_arr_append(results, item);
+        std::string name = "item_" + std::to_string(i);
+        yyjson_mut_obj_add_strcpy(doc, item, "name", name.c_str());
+        yyjson_mut_obj_add_real(doc, item, "value", static_cast<double>(i) * 1.5);
+        yyjson_mut_arr_append(items, item);
     }
     
-    char *json = yyjson_mut_write(mut_doc, 0, nullptr);
-    std::string resultStr(json);
+    yyjson_mut_obj_add_val(doc, data, "items", items);
+    yyjson_mut_obj_add_val(doc, root, "data", data);
+    
+    char *json = yyjson_mut_write(doc, 0, nullptr);
+    g_json_buffer = json;
     free(json);
+    yyjson_mut_doc_free(doc);
     
-    yyjson_mut_doc_free(mut_doc);
-    yyjson_doc_free(doc);
-    
-    return resultStr;
+    return g_json_buffer.c_str();
 }
 
-static yyjson_mut_val* createComplexObjectHelper(yyjson_mut_doc *doc, int depth, int breadth) {
-    yyjson_mut_val *obj = yyjson_mut_obj(doc);
-    yyjson_mut_obj_add_int(doc, obj, "depth", depth);
-    yyjson_mut_obj_add_int(doc, obj, "breadth", breadth);
+EMSCRIPTEN_KEEPALIVE
+const char* generateNumberArrayJSON(int count) {
+    yyjson_mut_doc *doc = yyjson_mut_doc_new(nullptr);
+    yyjson_mut_val *arr = yyjson_mut_arr(doc);
+    yyjson_mut_doc_set_root(doc, arr);
+    
+    for (int i = 0; i < count; i++) {
+        double val = static_cast<double>(i) * 0.5 + sin(static_cast<double>(i));
+        yyjson_mut_arr_add_real(doc, arr, val);
+    }
+    
+    char *json = yyjson_mut_write(doc, 0, nullptr);
+    g_json_buffer = json;
+    free(json);
+    yyjson_mut_doc_free(doc);
+    
+    return g_json_buffer.c_str();
+}
+
+EMSCRIPTEN_KEEPALIVE
+const char* generateObjectArrayJSON(int count) {
+    yyjson_mut_doc *doc = yyjson_mut_doc_new(nullptr);
+    yyjson_mut_val *arr = yyjson_mut_arr(doc);
+    yyjson_mut_doc_set_root(doc, arr);
+    
+    for (int i = 0; i < count; i++) {
+        yyjson_mut_val *item = yyjson_mut_obj(doc);
+        yyjson_mut_obj_add_int(doc, item, "id", i);
+        
+        std::string name = "object_" + std::to_string(i);
+        yyjson_mut_obj_add_strcpy(doc, item, "name", name.c_str());
+        yyjson_mut_obj_add_real(doc, item, "value", static_cast<double>(i) * 2.5);
+        yyjson_mut_arr_append(arr, item);
+    }
+    
+    char *json = yyjson_mut_write(doc, 0, nullptr);
+    g_json_buffer = json;
+    free(json);
+    yyjson_mut_doc_free(doc);
+    
+    return g_json_buffer.c_str();
+}
+
+static void buildTreeJSON(yyjson_mut_doc *doc, yyjson_mut_val *node, int depth, int breadth) {
+    yyjson_mut_obj_add_int(doc, node, "depth", depth);
+    yyjson_mut_obj_add_int(doc, node, "breadth", breadth);
     
     if (depth > 0) {
         yyjson_mut_val *children = yyjson_mut_arr(doc);
         for (int i = 0; i < breadth; i++) {
-            yyjson_mut_arr_append(children, createComplexObjectHelper(doc, depth - 1, breadth));
+            yyjson_mut_val *child = yyjson_mut_obj(doc);
+            buildTreeJSON(doc, child, depth - 1, breadth);
+            yyjson_mut_arr_append(children, child);
         }
-        yyjson_mut_obj_add_val(doc, obj, "children", children);
+        yyjson_mut_obj_add_val(doc, node, "children", children);
     }
-    
-    return obj;
 }
 
-/**
- * Create a complex nested JSON structure
- */
-std::string createComplexObject(int depth, int breadth) {
-    yyjson_mut_doc *mut_doc = yyjson_mut_doc_new(nullptr);
-    yyjson_mut_val *result = createComplexObjectHelper(mut_doc, depth, breadth);
-    yyjson_mut_doc_set_root(mut_doc, result);
+EMSCRIPTEN_KEEPALIVE
+const char* generateTreeJSON(int depth, int breadth) {
+    yyjson_mut_doc *doc = yyjson_mut_doc_new(nullptr);
+    yyjson_mut_val *root = yyjson_mut_obj(doc);
+    yyjson_mut_doc_set_root(doc, root);
     
-    char *json = yyjson_mut_write(mut_doc, 0, nullptr);
-    std::string resultStr(json);
+    buildTreeJSON(doc, root, depth, breadth);
+    
+    char *json = yyjson_mut_write(doc, 0, nullptr);
+    g_json_buffer = json;
     free(json);
+    yyjson_mut_doc_free(doc);
     
-    yyjson_mut_doc_free(mut_doc);
-    
-    return resultStr;
+    return g_json_buffer.c_str();
 }
 
-static int countNodesHelper(yyjson_val *obj) {
-    int count = 1;
-    yyjson_val *children = yyjson_obj_get(obj, "children");
-    if (children && yyjson_is_arr(children)) {
-        size_t idx, max_idx;
-        yyjson_val *child;
-        yyjson_arr_foreach(children, idx, max_idx, child) {
-            count += countNodesHelper(child);
-        }
-    }
-    return count;
-}
-
-/**
- * Count total nodes in a nested JSON structure
- */
-int countNodes(const std::string& jsonStr) {
-    yyjson_doc *doc = yyjson_read(jsonStr.c_str(), jsonStr.length(), 0);
-    if (!doc) return 0;
-    
-    yyjson_val *root = yyjson_doc_get_root(doc);
-    int count = countNodesHelper(root);
-    
-    yyjson_doc_free(doc);
-    return count;
-}
-
-EMSCRIPTEN_BINDINGS(benchmark_json) {
-    function("processFlat", &processFlat);
-    function("processNested", &processNested);
-    function("processNumberArray", &processNumberArray);
-    function("processObjectArray", &processObjectArray);
-    function("createComplexObject", &createComplexObject);
-    function("countNodes", &countNodes);
-}
+} // extern "C"

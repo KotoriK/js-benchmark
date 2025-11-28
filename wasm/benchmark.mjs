@@ -3,10 +3,12 @@
  * @file benchmark.mjs
  * @description WebAssembly Data Transfer Benchmark Runner
  * 
- * This script benchmarks three methods of data transfer between JavaScript and WebAssembly:
- * 1. embind - Using emscripten::val for automatic type conversion
- * 2. JSON - Serializing/deserializing via yyjson
- * 3. MessagePack - Binary serialization via msgpack-c
+ * This script benchmarks data transfer FROM C++ (WASM) TO JavaScript using three methods:
+ * 
+ * 1. embind (value_object): Register C++ structs with embind for automatic conversion
+ * 2. embind (manual val): Build JS objects manually using emscripten::val in C++
+ * 3. JSON: Serialize in C++, transfer raw string via WASM memory, parse in JS
+ * 4. MessagePack: Serialize in C++, transfer raw bytes via WASM memory, decode in JS
  * 
  * Run: node benchmark.mjs
  */
@@ -16,77 +18,11 @@ import { createRequire } from 'module';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
-import { encode, decode } from '@msgpack/msgpack';
+import { decode } from '@msgpack/msgpack';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILD_DIR = join(__dirname, 'build');
-
-/**
- * Test Data Generators
- */
-const TestData = {
-    /**
-     * Generate a flat object with primitive types
-     */
-    flatObject(size = 'small') {
-        const sizes = {
-            small: { nameLen: 10, strCount: 1 },
-            medium: { nameLen: 100, strCount: 10 },
-            large: { nameLen: 1000, strCount: 50 }
-        };
-        const s = sizes[size] || sizes.small;
-        return {
-            id: 42,
-            name: 'x'.repeat(s.nameLen),
-            value: 3.14159265359,
-            flag: true
-        };
-    },
-
-    /**
-     * Generate a nested object
-     */
-    nestedObject(depth = 3, itemCount = 10) {
-        const items = Array.from({ length: itemCount }, (_, i) => ({
-            id: i,
-            name: `item_${i}`,
-            value: Math.random() * 100
-        }));
-        
-        let obj = { data: { items } };
-        for (let i = 0; i < depth - 1; i++) {
-            obj = { nested: obj };
-        }
-        return obj;
-    },
-
-    /**
-     * Generate a number array
-     */
-    numberArray(count = 1000) {
-        return Array.from({ length: count }, () => Math.random() * 1000);
-    },
-
-    /**
-     * Generate an array of objects
-     */
-    objectArray(count = 100) {
-        return Array.from({ length: count }, (_, i) => ({
-            id: i,
-            name: `object_${i}`,
-            value: Math.random() * 1000,
-            active: i % 2 === 0
-        }));
-    },
-
-    /**
-     * Generate a deeply nested tree structure
-     */
-    deepTree(depth = 4, breadth = 3) {
-        return { depth, breadth };
-    }
-};
 
 /**
  * Benchmark utilities
@@ -103,19 +39,19 @@ class Benchmark {
     async run(fn, iterations = 100, warmup = 10) {
         // Warmup
         for (let i = 0; i < warmup; i++) {
-            await fn();
+            fn();
         }
 
         // Actual benchmark
         const times = [];
         for (let i = 0; i < iterations; i++) {
             const start = performance.now();
-            await fn();
+            fn();
             const end = performance.now();
             times.push(end - start);
         }
 
-        const sorted = times.sort((a, b) => a - b);
+        const sorted = times.slice().sort((a, b) => a - b);
         return {
             min: sorted[0],
             max: sorted[sorted.length - 1],
@@ -136,9 +72,9 @@ class Benchmark {
      * Print results as table
      */
     printResults() {
-        console.log(`\n${'='.repeat(80)}`);
+        console.log(`\n${'='.repeat(90)}`);
         console.log(`Benchmark Results: ${this.name}`);
-        console.log('='.repeat(80));
+        console.log('='.repeat(90));
         
         const grouped = {};
         for (const r of this.results) {
@@ -148,19 +84,19 @@ class Benchmark {
 
         for (const [test, results] of Object.entries(grouped)) {
             console.log(`\n${test}:`);
-            console.log('-'.repeat(70));
+            console.log('-'.repeat(85));
             console.log(
-                'Method'.padEnd(15),
+                'Method'.padEnd(25),
                 'Avg (ms)'.padStart(12),
                 'Median (ms)'.padStart(12),
                 'Min (ms)'.padStart(12),
                 'P95 (ms)'.padStart(12)
             );
-            console.log('-'.repeat(70));
+            console.log('-'.repeat(85));
             
             for (const r of results) {
                 console.log(
-                    r.method.padEnd(15),
+                    r.method.padEnd(25),
                     r.avg.toFixed(4).padStart(12),
                     r.median.toFixed(4).padStart(12),
                     r.min.toFixed(4).padStart(12),
@@ -184,8 +120,8 @@ async function loadWasmModule(createFn, wasmPath) {
  */
 async function main() {
     console.log('Loading WebAssembly modules...');
+    console.log('NOTE: Testing C++ → JS data transfer (data generated in WASM)\n');
     
-    // Load WASM modules using CommonJS require (compatible with older emscripten)
     let embindModule, jsonModule, msgpackModule;
     
     try {
@@ -214,50 +150,73 @@ async function main() {
 
     if (!embindModule && !jsonModule && !msgpackModule) {
         console.error('\nNo modules loaded. Please build the WASM modules first.');
-        console.log('Run: mkdir -p build && cd build && emcmake cmake .. && emmake make');
+        console.log('Run: npm run build');
         process.exit(1);
     }
 
     const iterations = parseInt(process.env.ITERATIONS || '100', 10);
     console.log(`\nRunning ${iterations} iterations per benchmark...\n`);
 
-    // Run benchmarks for different data types and sizes
+    // Run benchmarks
     await runFlatObjectBenchmarks(embindModule, jsonModule, msgpackModule, iterations);
     await runNestedObjectBenchmarks(embindModule, jsonModule, msgpackModule, iterations);
     await runNumberArrayBenchmarks(embindModule, jsonModule, msgpackModule, iterations);
     await runObjectArrayBenchmarks(embindModule, jsonModule, msgpackModule, iterations);
-    await runComplexTreeBenchmarks(embindModule, jsonModule, msgpackModule, iterations);
+    await runTreeBenchmarks(embindModule, jsonModule, msgpackModule, iterations);
 }
 
 async function runFlatObjectBenchmarks(embind, json, msgpack, iterations) {
-    const benchmark = new Benchmark('Flat Object Processing');
+    const benchmark = new Benchmark('Flat Object (C++ → JS)');
     
-    for (const size of ['small', 'medium', 'large']) {
-        const data = TestData.flatObject(size);
-        const jsonStr = JSON.stringify(data);
-        const msgpackData = encode(data);
-        
-        const testName = `flat_${size}`;
+    for (const nameLen of [10, 100, 1000]) {
+        const testName = `flat_nameLen${nameLen}`;
 
+        // embind with value_object (automatic struct conversion)
         if (embind) {
-            const stats = await benchmark.run(() => embind.processFlat(data), iterations);
-            benchmark.addResult(testName, 'embind', stats);
+            const stats = await benchmark.run(() => {
+                const obj = embind.generateFlatStruct(nameLen);
+                // Access properties to ensure full transfer
+                const _ = obj.id + obj.name.length + obj.value;
+            }, iterations);
+            benchmark.addResult(testName, 'embind_value_object', stats);
         }
 
+        // embind with manual val construction
+        if (embind) {
+            const stats = await benchmark.run(() => {
+                const obj = embind.generateFlatManual(nameLen);
+                const _ = obj.id + obj.name.length + obj.value;
+            }, iterations);
+            benchmark.addResult(testName, 'embind_manual_val', stats);
+        }
+
+        // JSON: C++ serializes, JS reads from memory and parses
         if (json) {
+            const generateFlatJSON = json.cwrap('generateFlatJSON', 'number', ['number']);
+            const getLastJSONLength = json.cwrap('getLastJSONLength', 'number', []);
+            
             const stats = await benchmark.run(() => {
-                const result = json.processFlat(jsonStr);
-                return JSON.parse(result);
+                const ptr = generateFlatJSON(nameLen);
+                const jsonStr = json.UTF8ToString(ptr);
+                const obj = JSON.parse(jsonStr);
+                const _ = obj.id + obj.name.length + obj.value;
             }, iterations);
-            benchmark.addResult(testName, 'json', stats);
+            benchmark.addResult(testName, 'json_memory_access', stats);
         }
 
+        // MessagePack: C++ serializes, JS reads from memory and decodes
         if (msgpack) {
+            const generateFlatMsgpack = msgpack.cwrap('generateFlatMsgpack', 'number', ['number']);
+            const getLastMsgpackLength = msgpack.cwrap('getLastMsgpackLength', 'number', []);
+            
             const stats = await benchmark.run(() => {
-                const result = msgpack.processFlat(new Uint8Array(msgpackData));
-                return decode(result);
+                const ptr = generateFlatMsgpack(nameLen);
+                const len = getLastMsgpackLength();
+                const data = new Uint8Array(msgpack.HEAPU8.buffer, ptr, len);
+                const obj = decode(data);
+                const _ = obj.id + obj.name.length + obj.value;
             }, iterations);
-            benchmark.addResult(testName, 'msgpack', stats);
+            benchmark.addResult(testName, 'msgpack_memory_access', stats);
         }
     }
 
@@ -265,34 +224,51 @@ async function runFlatObjectBenchmarks(embind, json, msgpack, iterations) {
 }
 
 async function runNestedObjectBenchmarks(embind, json, msgpack, iterations) {
-    const benchmark = new Benchmark('Nested Object Processing');
+    const benchmark = new Benchmark('Nested Object (C++ → JS)');
     
-    for (const [depth, itemCount] of [[2, 10], [3, 50], [4, 100]]) {
-        const data = TestData.nestedObject(depth, itemCount);
-        const jsonStr = JSON.stringify(data);
-        const msgpackData = encode(data);
-        
-        const testName = `nested_d${depth}_i${itemCount}`;
+    for (const itemCount of [10, 50, 100]) {
+        const testName = `nested_items${itemCount}`;
 
         if (embind) {
-            const stats = await benchmark.run(() => embind.processNested(data), iterations);
-            benchmark.addResult(testName, 'embind', stats);
+            const stats = await benchmark.run(() => {
+                const obj = embind.generateNestedStruct(itemCount);
+                const _ = obj.data.items.size();
+            }, iterations);
+            benchmark.addResult(testName, 'embind_value_object', stats);
+        }
+
+        if (embind) {
+            const stats = await benchmark.run(() => {
+                const obj = embind.generateNestedManual(itemCount);
+                const _ = obj.data.items.length;
+            }, iterations);
+            benchmark.addResult(testName, 'embind_manual_val', stats);
         }
 
         if (json) {
+            const generateNestedJSON = json.cwrap('generateNestedJSON', 'number', ['number']);
+            
             const stats = await benchmark.run(() => {
-                const result = json.processNested(jsonStr);
-                return JSON.parse(result);
+                const ptr = generateNestedJSON(itemCount);
+                const jsonStr = json.UTF8ToString(ptr);
+                const obj = JSON.parse(jsonStr);
+                const _ = obj.data.items.length;
             }, iterations);
-            benchmark.addResult(testName, 'json', stats);
+            benchmark.addResult(testName, 'json_memory_access', stats);
         }
 
         if (msgpack) {
+            const generateNestedMsgpack = msgpack.cwrap('generateNestedMsgpack', 'number', ['number']);
+            const getLastMsgpackLength = msgpack.cwrap('getLastMsgpackLength', 'number', []);
+            
             const stats = await benchmark.run(() => {
-                const result = msgpack.processNested(new Uint8Array(msgpackData));
-                return decode(result);
+                const ptr = generateNestedMsgpack(itemCount);
+                const len = getLastMsgpackLength();
+                const data = new Uint8Array(msgpack.HEAPU8.buffer, ptr, len);
+                const obj = decode(data);
+                const _ = obj.data.items.length;
             }, iterations);
-            benchmark.addResult(testName, 'msgpack', stats);
+            benchmark.addResult(testName, 'msgpack_memory_access', stats);
         }
     }
 
@@ -300,34 +276,51 @@ async function runNestedObjectBenchmarks(embind, json, msgpack, iterations) {
 }
 
 async function runNumberArrayBenchmarks(embind, json, msgpack, iterations) {
-    const benchmark = new Benchmark('Number Array Processing');
+    const benchmark = new Benchmark('Number Array (C++ → JS)');
     
     for (const count of [100, 1000, 10000]) {
-        const data = TestData.numberArray(count);
-        const jsonStr = JSON.stringify(data);
-        const msgpackData = encode(data);
-        
         const testName = `numbers_${count}`;
 
         if (embind) {
-            const stats = await benchmark.run(() => embind.processNumberArray(data), iterations);
-            benchmark.addResult(testName, 'embind', stats);
+            const stats = await benchmark.run(() => {
+                const arr = embind.generateNumberArrayStruct(count);
+                const _ = arr.size();
+            }, iterations);
+            benchmark.addResult(testName, 'embind_value_object', stats);
+        }
+
+        if (embind) {
+            const stats = await benchmark.run(() => {
+                const arr = embind.generateNumberArrayManual(count);
+                const _ = arr.length;
+            }, iterations);
+            benchmark.addResult(testName, 'embind_manual_val', stats);
         }
 
         if (json) {
+            const generateNumberArrayJSON = json.cwrap('generateNumberArrayJSON', 'number', ['number']);
+            
             const stats = await benchmark.run(() => {
-                const result = json.processNumberArray(jsonStr);
-                return JSON.parse(result);
+                const ptr = generateNumberArrayJSON(count);
+                const jsonStr = json.UTF8ToString(ptr);
+                const arr = JSON.parse(jsonStr);
+                const _ = arr.length;
             }, iterations);
-            benchmark.addResult(testName, 'json', stats);
+            benchmark.addResult(testName, 'json_memory_access', stats);
         }
 
         if (msgpack) {
+            const generateNumberArrayMsgpack = msgpack.cwrap('generateNumberArrayMsgpack', 'number', ['number']);
+            const getLastMsgpackLength = msgpack.cwrap('getLastMsgpackLength', 'number', []);
+            
             const stats = await benchmark.run(() => {
-                const result = msgpack.processNumberArray(new Uint8Array(msgpackData));
-                return decode(result);
+                const ptr = generateNumberArrayMsgpack(count);
+                const len = getLastMsgpackLength();
+                const data = new Uint8Array(msgpack.HEAPU8.buffer, ptr, len);
+                const arr = decode(data);
+                const _ = arr.length;
             }, iterations);
-            benchmark.addResult(testName, 'msgpack', stats);
+            benchmark.addResult(testName, 'msgpack_memory_access', stats);
         }
     }
 
@@ -335,69 +328,103 @@ async function runNumberArrayBenchmarks(embind, json, msgpack, iterations) {
 }
 
 async function runObjectArrayBenchmarks(embind, json, msgpack, iterations) {
-    const benchmark = new Benchmark('Object Array Processing');
+    const benchmark = new Benchmark('Object Array (C++ → JS)');
     
     for (const count of [10, 100, 500]) {
-        const data = TestData.objectArray(count);
-        const jsonStr = JSON.stringify(data);
-        const msgpackData = encode(data);
-        
         const testName = `objects_${count}`;
 
         if (embind) {
-            const stats = await benchmark.run(() => embind.processObjectArray(data), iterations);
-            benchmark.addResult(testName, 'embind', stats);
+            const stats = await benchmark.run(() => {
+                const arr = embind.generateObjectArrayStruct(count);
+                const _ = arr.size();
+            }, iterations);
+            benchmark.addResult(testName, 'embind_value_object', stats);
+        }
+
+        if (embind) {
+            const stats = await benchmark.run(() => {
+                const arr = embind.generateObjectArrayManual(count);
+                const _ = arr.length;
+            }, iterations);
+            benchmark.addResult(testName, 'embind_manual_val', stats);
         }
 
         if (json) {
+            const generateObjectArrayJSON = json.cwrap('generateObjectArrayJSON', 'number', ['number']);
+            
             const stats = await benchmark.run(() => {
-                const result = json.processObjectArray(jsonStr);
-                return JSON.parse(result);
+                const ptr = generateObjectArrayJSON(count);
+                const jsonStr = json.UTF8ToString(ptr);
+                const arr = JSON.parse(jsonStr);
+                const _ = arr.length;
             }, iterations);
-            benchmark.addResult(testName, 'json', stats);
+            benchmark.addResult(testName, 'json_memory_access', stats);
         }
 
         if (msgpack) {
+            const generateObjectArrayMsgpack = msgpack.cwrap('generateObjectArrayMsgpack', 'number', ['number']);
+            const getLastMsgpackLength = msgpack.cwrap('getLastMsgpackLength', 'number', []);
+            
             const stats = await benchmark.run(() => {
-                const result = msgpack.processObjectArray(new Uint8Array(msgpackData));
-                return decode(result);
+                const ptr = generateObjectArrayMsgpack(count);
+                const len = getLastMsgpackLength();
+                const data = new Uint8Array(msgpack.HEAPU8.buffer, ptr, len);
+                const arr = decode(data);
+                const _ = arr.length;
             }, iterations);
-            benchmark.addResult(testName, 'msgpack', stats);
+            benchmark.addResult(testName, 'msgpack_memory_access', stats);
         }
     }
 
     benchmark.printResults();
 }
 
-async function runComplexTreeBenchmarks(embind, json, msgpack, iterations) {
-    const benchmark = new Benchmark('Complex Tree Creation & Traversal');
+async function runTreeBenchmarks(embind, json, msgpack, iterations) {
+    const benchmark = new Benchmark('Tree Structure (C++ → JS)');
     
     for (const [depth, breadth] of [[3, 2], [4, 3], [5, 2]]) {
         const testName = `tree_d${depth}_b${breadth}`;
 
-        // Test creation
         if (embind) {
             const stats = await benchmark.run(() => {
-                const tree = embind.createComplexObject(depth, breadth);
-                return embind.countNodes(tree);
+                const tree = embind.generateTreeStruct(depth, breadth);
+                const _ = tree.depth + tree.breadth;
             }, iterations);
-            benchmark.addResult(`${testName}_create+count`, 'embind', stats);
+            benchmark.addResult(testName, 'embind_value_object', stats);
+        }
+
+        if (embind) {
+            const stats = await benchmark.run(() => {
+                const tree = embind.generateTreeManual(depth, breadth);
+                const _ = tree.depth + tree.breadth;
+            }, iterations);
+            benchmark.addResult(testName, 'embind_manual_val', stats);
         }
 
         if (json) {
+            const generateTreeJSON = json.cwrap('generateTreeJSON', 'number', ['number', 'number']);
+            
             const stats = await benchmark.run(() => {
-                const treeJson = json.createComplexObject(depth, breadth);
-                return json.countNodes(treeJson);
+                const ptr = generateTreeJSON(depth, breadth);
+                const jsonStr = json.UTF8ToString(ptr);
+                const tree = JSON.parse(jsonStr);
+                const _ = tree.depth + tree.breadth;
             }, iterations);
-            benchmark.addResult(`${testName}_create+count`, 'json', stats);
+            benchmark.addResult(testName, 'json_memory_access', stats);
         }
 
         if (msgpack) {
+            const generateTreeMsgpack = msgpack.cwrap('generateTreeMsgpack', 'number', ['number', 'number']);
+            const getLastMsgpackLength = msgpack.cwrap('getLastMsgpackLength', 'number', []);
+            
             const stats = await benchmark.run(() => {
-                const treePacked = msgpack.createComplexObject(depth, breadth);
-                return msgpack.countNodes(treePacked);
+                const ptr = generateTreeMsgpack(depth, breadth);
+                const len = getLastMsgpackLength();
+                const data = new Uint8Array(msgpack.HEAPU8.buffer, ptr, len);
+                const tree = decode(data);
+                const _ = tree.depth + tree.breadth;
             }, iterations);
-            benchmark.addResult(`${testName}_create+count`, 'msgpack', stats);
+            benchmark.addResult(testName, 'msgpack_memory_access', stats);
         }
     }
 

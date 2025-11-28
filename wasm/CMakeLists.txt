@@ -16,8 +16,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(yyjson)
 
-# Common emscripten settings (compatible with older emscripten versions)
-# Use CommonJS format for Node.js compatibility with older emscripten
+# Common emscripten settings
 set(EMSCRIPTEN_COMMON_FLAGS
     "-sENVIRONMENT=node"
     "-sMODULARIZE=1"
@@ -25,7 +24,7 @@ set(EMSCRIPTEN_COMMON_FLAGS
     "-O3"
 )
 
-# embind benchmark module
+# embind benchmark module - uses embind for value_object and manual val
 add_executable(benchmark_embind src/benchmark_embind.cpp)
 target_link_libraries(benchmark_embind PRIVATE embind)
 set_target_properties(benchmark_embind PROPERTIES
@@ -37,9 +36,9 @@ target_link_options(benchmark_embind PRIVATE
     "-sEXPORT_NAME=createEmbindModule"
 )
 
-# JSON (yyjson) benchmark module
+# JSON (yyjson) benchmark module - uses direct memory access, NO embind
 add_executable(benchmark_json src/benchmark_json.cpp)
-target_link_libraries(benchmark_json PRIVATE yyjson embind)
+target_link_libraries(benchmark_json PRIVATE yyjson)
 set_target_properties(benchmark_json PROPERTIES
     OUTPUT_NAME "benchmark_json"
     SUFFIX ".cjs"
@@ -47,13 +46,12 @@ set_target_properties(benchmark_json PROPERTIES
 target_link_options(benchmark_json PRIVATE
     ${EMSCRIPTEN_COMMON_FLAGS}
     "-sEXPORT_NAME=createJsonModule"
-    "-sEXPORTED_FUNCTIONS=['_malloc','_free']"
-    "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToUTF8','lengthBytesUTF8','getValue','setValue']"
+    "-sEXPORTED_FUNCTIONS=['_generateFlatJSON','_getLastJSONLength','_generateNestedJSON','_generateNumberArrayJSON','_generateObjectArrayJSON','_generateTreeJSON']"
+    "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','cwrap']"
 )
 
-# MessagePack benchmark module (uses lightweight msgpack implementation)
+# MessagePack benchmark module - uses direct memory access, NO embind
 add_executable(benchmark_msgpack src/benchmark_msgpack.cpp)
-target_link_libraries(benchmark_msgpack PRIVATE embind)
 set_target_properties(benchmark_msgpack PROPERTIES
     OUTPUT_NAME "benchmark_msgpack"
     SUFFIX ".cjs"
@@ -61,6 +59,6 @@ set_target_properties(benchmark_msgpack PROPERTIES
 target_link_options(benchmark_msgpack PRIVATE
     ${EMSCRIPTEN_COMMON_FLAGS}
     "-sEXPORT_NAME=createMsgpackModule"
-    "-sEXPORTED_FUNCTIONS=['_malloc','_free']"
-    "-sEXPORTED_RUNTIME_METHODS=['HEAPU8']"
+    "-sEXPORTED_FUNCTIONS=['_generateFlatMsgpack','_getLastMsgpackLength','_generateNestedMsgpack','_generateNumberArrayMsgpack','_generateObjectArrayMsgpack','_generateTreeMsgpack']"
+    "-sEXPORTED_RUNTIME_METHODS=['HEAPU8','cwrap']"
 )
