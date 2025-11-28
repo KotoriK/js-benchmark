@@ -26,6 +26,9 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILD_DIR = join(__dirname, 'build');
 
+// Byte size constants for binary parsing
+const FLOAT64_BYTE_SIZE = 8;
+
 /**
  * Benchmark utilities
  */
@@ -425,7 +428,7 @@ async function runNumberArrayBenchmarks(embind, json, msgpack, cstruct, iteratio
                 const arr = [];
                 const dataView = new DataView(buf.buffer, buf.byteOffset + NumberArrayHeaderDef.size);
                 for (let i = 0; i < header.count; i++) {
-                    arr.push(dataView.getFloat64(i * 8, true)); // little endian
+                    arr.push(dataView.getFloat64(i * FLOAT64_BYTE_SIZE, true)); // little endian
                 }
                 
                 const _ = arr.length;

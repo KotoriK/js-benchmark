@@ -21,7 +21,11 @@
 // These structs use fixed-size types for predictable binary representation
 // ============================================================================
 
-#pragma pack(push, 1) // Ensure no padding for consistent binary layout
+// Use packed structs (no padding) for consistent binary layout across platforms.
+// Note: Packed structs may have performance penalties on some architectures
+// due to unaligned memory access, but this ensures JavaScript can parse
+// the exact binary layout without needing to account for compiler-specific padding.
+#pragma pack(push, 1)
 
 /**
  * Flat object struct - fixed size with inline string buffer
@@ -82,6 +86,7 @@ struct TreeNodeHeader {
 
 // ============================================================================
 // Global buffers for binary output
+// Note: Single-threaded WASM environment - thread safety not required.
 // ============================================================================
 
 static std::vector<uint8_t> g_buffer;
