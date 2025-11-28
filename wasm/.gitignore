@@ -1,0 +1,12 @@
+# Build output
+build/
+
+# Node.js dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# System files
+.DS_Store
