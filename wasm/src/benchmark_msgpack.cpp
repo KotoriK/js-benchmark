@@ -15,7 +15,6 @@
 #include <string>
 #include <cstdint>
 #include <cmath>
-#include <sstream>
 
 // Global buffer for msgpack output
 static msgpack::sbuffer g_buffer;

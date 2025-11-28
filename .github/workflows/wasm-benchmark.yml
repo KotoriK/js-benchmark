@@ -80,6 +80,7 @@ jobs:
           // Parse benchmark results
           const lines = output.split('\n');
           let currentBenchmark = null;
+          let currentTestName = 'unknown';
           let inResults = false;
           
           for (const line of lines) {
@@ -90,21 +91,25 @@ jobs:
               };
               results.benchmarks.push(currentBenchmark);
               inResults = false;
+              currentTestName = 'unknown';
             } else if (line.includes('Method') && line.includes('Avg')) {
               inResults = true;
+            } else if (line.endsWith(':') && !line.includes('Benchmark') && !line.startsWith('-') && !line.startsWith('=')) {
+              // This is a test name line (e.g., 'flat_nameLen10:')
+              currentTestName = line.replace(':', '').trim();
+              inResults = false;
             } else if (inResults && line.trim() && !line.startsWith('-') && !line.startsWith('=')) {
               const parts = line.trim().split(/\s+/);
               if (parts.length >= 5) {
-                const testName = parts[0];
                 const method = parts[0];
                 const avg = parseFloat(parts[1]);
                 const median = parseFloat(parts[2]);
                 const min = parseFloat(parts[3]);
                 const p95 = parseFloat(parts[4]);
                 
-                if (!isNaN(avg)) {
+                if (!isNaN(avg) && currentBenchmark) {
                   currentBenchmark.tests.push({
-                    test: currentBenchmark.tests.length > 0 ? currentBenchmark.tests[currentBenchmark.tests.length - 1].test : 'unknown',
+                    test: currentTestName,
                     method: method,
                     avg: avg,
                     median: median,
@@ -112,12 +117,6 @@ jobs:
                     p95: p95
                   });
                 }
-              }
-            } else if (line.includes(':') && !line.includes('Benchmark') && !line.includes('-')) {
-              // This is a test name line
-              const testName = line.replace(':', '').trim();
-              if (currentBenchmark && testName) {
-                // Mark for next entries
               }
             }
           }
