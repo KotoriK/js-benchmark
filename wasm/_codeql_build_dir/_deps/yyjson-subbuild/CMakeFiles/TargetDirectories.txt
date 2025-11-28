@@ -1,0 +1,3 @@
+/home/runner/work/js-benchmark/js-benchmark/wasm/_codeql_build_dir/_deps/yyjson-subbuild/CMakeFiles/yyjson-populate.dir
+/home/runner/work/js-benchmark/js-benchmark/wasm/_codeql_build_dir/_deps/yyjson-subbuild/CMakeFiles/edit_cache.dir
+/home/runner/work/js-benchmark/js-benchmark/wasm/_codeql_build_dir/_deps/yyjson-subbuild/CMakeFiles/rebuild_cache.dir

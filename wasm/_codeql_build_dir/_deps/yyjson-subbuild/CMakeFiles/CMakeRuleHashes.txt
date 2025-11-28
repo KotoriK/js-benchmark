@@ -1,0 +1,11 @@
+# Hashes of file build rules.
+bb13def065180e951f0572eb78769e82 CMakeFiles/yyjson-populate
+3996670660d3073a452e5574fda46ac7 CMakeFiles/yyjson-populate-complete
+423ab22d3b188f028fa078b27deb49f1 yyjson-populate-prefix/src/yyjson-populate-stamp/yyjson-populate-build
+69fcd458515445aeba1953ad2fcc88ba yyjson-populate-prefix/src/yyjson-populate-stamp/yyjson-populate-configure
+c839dd0b390b88d663cb3409139bee6e yyjson-populate-prefix/src/yyjson-populate-stamp/yyjson-populate-download
+435397a9847b5f08136e6a867370e833 yyjson-populate-prefix/src/yyjson-populate-stamp/yyjson-populate-install
+5a7da7e9ddc04912b731f899cd28832f yyjson-populate-prefix/src/yyjson-populate-stamp/yyjson-populate-mkdir
+ea4a762ff63f667c09b1a9ea1730fa89 yyjson-populate-prefix/src/yyjson-populate-stamp/yyjson-populate-patch
+791472adad87409bf47e1d19f623ec59 yyjson-populate-prefix/src/yyjson-populate-stamp/yyjson-populate-test
+a6c711dd7b8fa3caf5c6122c85ce5c83 yyjson-populate-prefix/src/yyjson-populate-stamp/yyjson-populate-update
