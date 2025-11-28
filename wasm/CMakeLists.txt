@@ -16,21 +16,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(yyjson)
 
-# Fetch msgpack-c (header-only for C++)
-FetchContent_Declare(
-    msgpack
-    GIT_REPOSITORY https://github.com/msgpack/msgpack-c.git
-    GIT_TAG cpp-6.1.1
-)
-FetchContent_MakeAvailable(msgpack)
-
-# Common emscripten settings
+# Common emscripten settings (compatible with older emscripten versions)
+# Use CommonJS format for Node.js compatibility with older emscripten
 set(EMSCRIPTEN_COMMON_FLAGS
     "-sENVIRONMENT=node"
     "-sMODULARIZE=1"
-    "-sEXPORT_ES6=1"
     "-sALLOW_MEMORY_GROWTH=1"
-    "-sSTACK_SIZE=1mb"
     "-O3"
 )
 
@@ -39,7 +30,7 @@ add_executable(benchmark_embind src/benchmark_embind.cpp)
 target_link_libraries(benchmark_embind PRIVATE embind)
 set_target_properties(benchmark_embind PROPERTIES
     OUTPUT_NAME "benchmark_embind"
-    SUFFIX ".mjs"
+    SUFFIX ".cjs"
 )
 target_link_options(benchmark_embind PRIVATE
     ${EMSCRIPTEN_COMMON_FLAGS}
@@ -51,7 +42,7 @@ add_executable(benchmark_json src/benchmark_json.cpp)
 target_link_libraries(benchmark_json PRIVATE yyjson embind)
 set_target_properties(benchmark_json PROPERTIES
     OUTPUT_NAME "benchmark_json"
-    SUFFIX ".mjs"
+    SUFFIX ".cjs"
 )
 target_link_options(benchmark_json PRIVATE
     ${EMSCRIPTEN_COMMON_FLAGS}
@@ -60,13 +51,12 @@ target_link_options(benchmark_json PRIVATE
     "-sEXPORTED_RUNTIME_METHODS=['UTF8ToString','stringToUTF8','lengthBytesUTF8','getValue','setValue']"
 )
 
-# MessagePack benchmark module  
+# MessagePack benchmark module (uses lightweight msgpack implementation)
 add_executable(benchmark_msgpack src/benchmark_msgpack.cpp)
 target_link_libraries(benchmark_msgpack PRIVATE embind)
-target_include_directories(benchmark_msgpack PRIVATE ${msgpack_SOURCE_DIR}/include)
 set_target_properties(benchmark_msgpack PROPERTIES
     OUTPUT_NAME "benchmark_msgpack"
-    SUFFIX ".mjs"
+    SUFFIX ".cjs"
 )
 target_link_options(benchmark_msgpack PRIVATE
     ${EMSCRIPTEN_COMMON_FLAGS}

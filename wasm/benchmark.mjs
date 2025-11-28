@@ -12,10 +12,13 @@
  */
 
 import { performance } from 'perf_hooks';
+import { createRequire } from 'module';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { readFileSync } from 'fs';
 import { encode, decode } from '@msgpack/msgpack';
 
+const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BUILD_DIR = join(__dirname, 'build');
 
@@ -169,33 +172,41 @@ class Benchmark {
 }
 
 /**
+ * Helper to load WASM module with wasmBinary option
+ */
+async function loadWasmModule(createFn, wasmPath) {
+    const wasmBinary = readFileSync(wasmPath);
+    return await createFn({ wasmBinary });
+}
+
+/**
  * Main benchmark runner
  */
 async function main() {
     console.log('Loading WebAssembly modules...');
     
-    // Dynamic imports of WASM modules
+    // Load WASM modules using CommonJS require (compatible with older emscripten)
     let embindModule, jsonModule, msgpackModule;
     
     try {
-        const createEmbind = (await import(join(BUILD_DIR, 'benchmark_embind.mjs'))).default;
-        embindModule = await createEmbind();
+        const createEmbind = require('./build/benchmark_embind.cjs');
+        embindModule = await loadWasmModule(createEmbind, join(BUILD_DIR, 'benchmark_embind.wasm'));
         console.log('✓ embind module loaded');
     } catch (e) {
         console.error('✗ Failed to load embind module:', e.message);
     }
 
     try {
-        const createJson = (await import(join(BUILD_DIR, 'benchmark_json.mjs'))).default;
-        jsonModule = await createJson();
+        const createJson = require('./build/benchmark_json.cjs');
+        jsonModule = await loadWasmModule(createJson, join(BUILD_DIR, 'benchmark_json.wasm'));
         console.log('✓ JSON (yyjson) module loaded');
     } catch (e) {
         console.error('✗ Failed to load JSON module:', e.message);
     }
 
     try {
-        const createMsgpack = (await import(join(BUILD_DIR, 'benchmark_msgpack.mjs'))).default;
-        msgpackModule = await createMsgpack();
+        const createMsgpack = require('./build/benchmark_msgpack.cjs');
+        msgpackModule = await loadWasmModule(createMsgpack, join(BUILD_DIR, 'benchmark_msgpack.wasm'));
         console.log('✓ MessagePack module loaded');
     } catch (e) {
         console.error('✗ Failed to load MessagePack module:', e.message);

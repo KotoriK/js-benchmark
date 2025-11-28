@@ -4,7 +4,7 @@ This benchmark compares three methods of transferring complex object data betwee
 
 1. **embind** - Using `emscripten::val` for automatic type conversion
 2. **JSON** - Serializing/deserializing via [yyjson](https://github.com/ibireme/yyjson)
-3. **MessagePack** - Binary serialization via [msgpack-c](https://github.com/msgpack/msgpack-c)
+3. **MessagePack** - Binary serialization via a lightweight custom implementation (msgpack-lite)
 
 ## Prerequisites
 
@@ -73,24 +73,44 @@ wasm/
 └── src/
     ├── benchmark_embind.cpp    # embind implementation
     ├── benchmark_json.cpp      # JSON/yyjson implementation
-    └── benchmark_msgpack.cpp   # MessagePack implementation
+    └── benchmark_msgpack.cpp   # MessagePack implementation (with embedded msgpack-lite)
 ```
 
 ## Dependencies
 
 Dependencies are managed via CMake FetchContent:
 
-- **yyjson** v0.10.0 - High-performance JSON library
-- **msgpack-c** cpp-6.1.1 - MessagePack for C/C++ (header-only)
+- **yyjson** v0.10.0 - High-performance JSON library for C
+- **@msgpack/msgpack** - JavaScript MessagePack library (for serialization on JS side)
+
+Note: The C++ MessagePack implementation uses a lightweight custom encoder/decoder
+(msgpack-lite) embedded in the source to avoid external Boost dependencies.
 
 ## Results Interpretation
 
-- **embind**: Most convenient API, automatic type conversion, potential overhead for complex objects
-- **JSON**: Text-based serialization, widely supported, parsing overhead
-- **MessagePack**: Binary format, smaller payload, faster parsing for structured data
+- **embind**: Most convenient API, automatic type conversion, excellent for small/simple objects
+- **JSON**: Text-based serialization, widely supported, good for structured data with yyjson's high performance
+- **MessagePack**: Binary format, smaller payload, but overhead from byte-by-byte array access
 
 The benchmark measures:
 - **Avg**: Average execution time
 - **Median**: 50th percentile execution time
 - **Min**: Minimum execution time
 - **P95**: 95th percentile execution time (captures tail latency)
+
+## Sample Results
+
+Based on Node.js v20 with Emscripten 3.1.6:
+
+| Test Case | embind (ms) | JSON (ms) | MessagePack (ms) |
+|-----------|-------------|-----------|------------------|
+| flat_small | 0.01 | 0.03 | 0.15 |
+| flat_large | 0.01 | 0.25 | 0.81 |
+| numbers_1000 | 0.21 | 0.24 | 2.66 |
+| objects_100 | 0.16 | 0.16 | 3.01 |
+| tree_d4_b3 | 0.29 | 0.11 | 2.20 |
+
+Key findings:
+- **embind** is fastest for most operations due to native V8 integration
+- **JSON (yyjson)** performs well for complex nested structures
+- **MessagePack** has higher overhead due to manual byte array handling in WASM
