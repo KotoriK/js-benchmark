@@ -76,3 +76,17 @@ target_link_options(benchmark_msgpack PRIVATE
     "-sEXPORTED_FUNCTIONS=['_generateFlatMsgpack','_getLastMsgpackLength','_generateNestedMsgpack','_generateNumberArrayMsgpack','_generateObjectArrayMsgpack','_generateTreeMsgpack']"
     "-sEXPORTED_RUNTIME_METHODS=['HEAPU8','cwrap']"
 )
+
+# typed-cstruct benchmark module - uses raw C structs, direct memory access, NO embind
+# JavaScript reads raw struct binary data and parses with typed-cstruct library
+add_executable(benchmark_cstruct src/benchmark_cstruct.cpp)
+set_target_properties(benchmark_cstruct PROPERTIES
+    OUTPUT_NAME "benchmark_cstruct"
+    SUFFIX ".cjs"
+)
+target_link_options(benchmark_cstruct PRIVATE
+    ${EMSCRIPTEN_COMMON_FLAGS}
+    "-sEXPORT_NAME=createCStructModule"
+    "-sEXPORTED_FUNCTIONS=['_generateFlatCStruct','_getLastCStructLength','_generateNestedCStruct','_generateNumberArrayCStruct','_generateObjectArrayCStruct','_generateTreeCStruct']"
+    "-sEXPORTED_RUNTIME_METHODS=['HEAPU8','cwrap']"
+)
