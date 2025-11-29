@@ -36,7 +36,6 @@ async function runFlatObjectBenchmarks(embind, json, msgpack, cstruct, iteration
         // JSON: C++ serializes, JS reads from memory and parses
         if (json) {
             const generateFlatJSON = json.cwrap('generateFlatJSON', 'number', ['number']);
-            const getLastJSONLength = json.cwrap('getLastJSONLength', 'number', []);
             
             const stats = await benchmark.run(() => {
                 const ptr = generateFlatJSON(nameLen);

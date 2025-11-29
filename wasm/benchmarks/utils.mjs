@@ -13,8 +13,8 @@ export const require = createRequire(import.meta.url);
 export const __dirname = dirname(fileURLToPath(import.meta.url));
 export const BUILD_DIR = join(__dirname, '..', 'build');
 
-// Byte size constants for binary parsing
-export const FLOAT64_BYTE_SIZE = 8;
+// Byte size constants for binary parsing (WASM uses little-endian by default)
+export const FLOAT64_BYTE_SIZE = 8;  // Size in bytes of a float64/double
 
 /**
  * Benchmark utilities
