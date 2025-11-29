@@ -45,10 +45,18 @@ emmake make
 ## Run Benchmark
 
 ```bash
+# Run all benchmarks sequentially (each in a separate process to reduce memory overhead)
 npm run benchmark
 
 # Or with custom iterations:
 ITERATIONS=500 node benchmark.mjs
+
+# Run individual benchmarks:
+npm run benchmark:flat      # Flat object benchmark
+npm run benchmark:nested    # Nested object benchmark
+npm run benchmark:numbers   # Number array benchmark
+npm run benchmark:objects   # Object array benchmark
+npm run benchmark:tree      # Tree structure benchmark
 ```
 
 ## GitHub Actions
@@ -94,8 +102,15 @@ The benchmark tests various data transfer scenarios (all data generated in C++):
 wasm/
 ├── CMakeLists.txt          # CMake build configuration
 ├── package.json            # Node.js dependencies and scripts
-├── benchmark.mjs           # JavaScript benchmark runner
+├── benchmark.mjs           # Main benchmark runner (runs all benchmarks sequentially)
 ├── README.md               # This file
+├── benchmarks/             # Individual benchmark files (run in separate processes)
+│   ├── utils.mjs           # Shared utilities (Benchmark class, module loading)
+│   ├── flat.mjs            # Flat object benchmark
+│   ├── nested.mjs          # Nested object benchmark
+│   ├── numbers.mjs         # Number array benchmark
+│   ├── objects.mjs         # Object array benchmark
+│   └── tree.mjs            # Tree structure benchmark
 └── src/
     ├── benchmark_embind.cpp    # embind implementation (value_object + manual val)
     ├── benchmark_json.cpp      # JSON/yyjson implementation (memory access)
