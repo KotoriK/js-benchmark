@@ -8,11 +8,6 @@
     "build": "mkdir -p build && cd build && emcmake cmake .. && emmake make",
     "build:clean": "rm -rf build && npm run build",
     "benchmark": "node benchmark.mjs",
-    "benchmark:flat": "node benchmarks/flat.mjs",
-    "benchmark:nested": "node benchmarks/nested.mjs",
-    "benchmark:numbers": "node benchmarks/numbers.mjs",
-    "benchmark:objects": "node benchmarks/objects.mjs",
-    "benchmark:tree": "node benchmarks/tree.mjs",
     "test": "node benchmark.mjs"
   },
   "keywords": [
