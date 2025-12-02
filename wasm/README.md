@@ -94,8 +94,14 @@ The benchmark tests various data transfer scenarios (all data generated in C++):
 wasm/
 ├── CMakeLists.txt          # CMake build configuration
 ├── package.json            # Node.js dependencies and scripts
-├── benchmark.mjs           # JavaScript benchmark runner
+├── benchmark.mjs           # Main benchmark runner
 ├── README.md               # This file
+├── benchmarks/             # Benchmark implementations (organized by C++ filename)
+│   ├── utils.mjs           # Shared utilities (Benchmark class, module loading)
+│   ├── benchmark_embind.mjs    # Benchmarks for benchmark_embind.cpp
+│   ├── benchmark_json.mjs      # Benchmarks for benchmark_json.cpp
+│   ├── benchmark_msgpack.mjs   # Benchmarks for benchmark_msgpack.cpp
+│   └── benchmark_cstruct.mjs   # Benchmarks for benchmark_cstruct.cpp
 └── src/
     ├── benchmark_embind.cpp    # embind implementation (value_object + manual val)
     ├── benchmark_json.cpp      # JSON/yyjson implementation (memory access)
@@ -106,6 +112,7 @@ wasm/
 ## Key Design Decisions
 
 - **Data flow**: C++ → JS (not JS → C++)
+- **Benchmark organization**: Grouped by C++ implementation files for code reusability
 - **embind tests both**: `value_object` AND manual `val::set()`
 - **JSON/MessagePack/typed-cstruct**: Use preamble.js APIs (`UTF8ToString`, `HEAPU8`) for direct memory access, not embind
 
