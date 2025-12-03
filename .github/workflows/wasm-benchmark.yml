@@ -107,7 +107,7 @@ jobs:
             timestamp: new Date().toISOString(),
             commit: process.env.GITHUB_SHA || 'local',
             ref: process.env.GITHUB_REF || 'local',
-            iterations: 200,
+            iterations: parseInt(process.env.ITERATIONS || '200', 10),
             systemInfo: systemInfo,
             rawOutput: output,
             benchmarks: []
@@ -611,9 +611,13 @@ jobs:
                     '<p>Failed to load benchmark results. Check console for details.</p>';
                 });
               
-              // Handle window resize
+              // Handle window resize with throttling
+              let resizeTimeout;
               window.addEventListener('resize', () => {
-                if (chart) chart.resize();
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                  if (chart) chart.resize();
+                }, 200);
               });
             </script>
           </body>
