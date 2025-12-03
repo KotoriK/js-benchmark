@@ -410,7 +410,7 @@ jobs:
                   benchmark.tests.forEach(test => {
                     // Normalize benchmark name by removing method suffix (e.g., " - embind", " - JSON")
                     // to group tests from different benchmark implementations together
-                    const baseBenchmarkName = benchmark.name.replace(/\s+-\s+(embind|JSON|msgpack|cstruct)$/i, '');
+                    const baseBenchmarkName = benchmark.name.replace(/\s+-\s+(typed-cstruct|embind|JSON|MessagePack)$/i, '');
                     const testKey = baseBenchmarkName + ' - ' + test.test;
                     testNames.add(testKey);
                     methods.add(test.method);
