@@ -185,7 +185,9 @@ jobs:
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>WASM Benchmark Results</title>
-            <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" 
+                    integrity="sha256-QvgynZibb2U53SsVu98NggJXYqwRL7tg3FeyfXvPOUY=" 
+                    crossorigin="anonymous"></script>
             <style>
               :root {
                 --bg-color: #1a1a2e;
@@ -421,7 +423,7 @@ jobs:
                 
                 Array.from(methods).forEach(method => {
                   const data = testNamesArray.map(testName => 
-                    dataByMethod[method][testName] || 0
+                    dataByMethod[method][testName] !== undefined ? dataByMethod[method][testName] : null
                   );
                   
                   series.push({
@@ -612,6 +614,7 @@ jobs:
                 });
               
               // Handle window resize with throttling
+              // Note: No cleanup needed as this is a static page with single initialization
               let resizeTimeout;
               window.addEventListener('resize', () => {
                 clearTimeout(resizeTimeout);
