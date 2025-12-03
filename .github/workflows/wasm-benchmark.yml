@@ -185,8 +185,9 @@ jobs:
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>WASM Benchmark Results</title>
+            <!-- ECharts 5.5.0 from jsDelivr CDN -->
+            <!-- TODO: Add SRI integrity hash after verifying from https://www.srihash.org/ -->
             <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" 
-                    integrity="sha256-QvgynZibb2U53SsVu98NggJXYqwRL7tg3FeyfXvPOUY=" 
                     crossorigin="anonymous"></script>
             <style>
               :root {
