@@ -545,12 +545,14 @@ jobs:
                 const file = fileMap[benchmarkType];
                 if (!file) return null;
                 
-                // Estimate line numbers based on test patterns and method types
+                // Line numbers are manually mapped to benchmark method calls
+                // Note: These may become outdated if source files are modified
+                // Consider updating these mappings when benchmark files change
                 let lineNumber = 1;
                 
                 // For embind, we have two methods: value_object and manual_val
                 if (benchmarkType === 'embind') {
-                  const isFirstMethod = method.includes('value_object');
+                  const isFirstMethod = (method === 'embind_value_object');
                   if (testName.startsWith('flat_')) {
                     lineNumber = isFirstMethod ? 43 : 51;
                   } else if (testName.startsWith('nested_')) {
