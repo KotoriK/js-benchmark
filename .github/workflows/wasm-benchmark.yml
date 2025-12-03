@@ -66,13 +66,49 @@ jobs:
           # Create JSON output for GitHub Pages
           node -e "
           const fs = require('fs');
+          const os = require('os');
           const output = fs.readFileSync('benchmark-output.txt', 'utf8');
+          
+          // Parse system information from output
+          let systemInfo = {
+            platform: 'unknown',
+            arch: 'unknown',
+            nodeVersion: 'unknown',
+            cpuModel: 'unknown',
+            cpuCores: 0,
+            totalMemoryGB: '0',
+            freeMemoryGB: '0'
+          };
+          
+          const sysInfoMatch = output.match(/System Information:[\s\S]*?(?=Loading WebAssembly modules|$)/);
+          if (sysInfoMatch) {
+            const sysText = sysInfoMatch[0];
+            const platformMatch = sysText.match(/Platform:\s*([^\(]+)\(([^\)]+)\)/);
+            const nodeMatch = sysText.match(/Node\.js:\s*([^\n]+)/);
+            const cpuMatch = sysText.match(/CPU:\s*(\d+)x\s*([^\n]+)/);
+            const memMatch = sysText.match(/Memory:\s*([\d.]+)\s*GB total,\s*([\d.]+)\s*GB free/);
+            
+            if (platformMatch) {
+              systemInfo.platform = platformMatch[1].trim();
+              systemInfo.arch = platformMatch[2].trim();
+            }
+            if (nodeMatch) systemInfo.nodeVersion = nodeMatch[1].trim();
+            if (cpuMatch) {
+              systemInfo.cpuCores = parseInt(cpuMatch[1]);
+              systemInfo.cpuModel = cpuMatch[2].trim();
+            }
+            if (memMatch) {
+              systemInfo.totalMemoryGB = memMatch[1];
+              systemInfo.freeMemoryGB = memMatch[2];
+            }
+          }
           
           const results = {
             timestamp: new Date().toISOString(),
             commit: process.env.GITHUB_SHA || 'local',
             ref: process.env.GITHUB_REF || 'local',
             iterations: 200,
+            systemInfo: systemInfo,
             rawOutput: output,
             benchmarks: []
           };
@@ -141,7 +177,7 @@ jobs:
           cp wasm/benchmark-results.json public/
           cp wasm/benchmark-output.txt public/
           
-          # Create index.html
+          # Create index.html with Apache ECharts
           cat > public/index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="en">
@@ -149,6 +185,7 @@ jobs:
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>WASM Benchmark Results</title>
+            <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
             <style>
               :root {
                 --bg-color: #1a1a2e;
@@ -168,7 +205,7 @@ jobs:
               }
               
               .container {
-                max-width: 1200px;
+                max-width: 1400px;
                 margin: 0 auto;
               }
               
@@ -194,11 +231,31 @@ jobs:
                 margin: 5px 0;
               }
               
+              .system-info {
+                background: var(--card-bg);
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 10px;
+              }
+              
+              .system-info-item {
+                padding: 8px;
+              }
+              
               .benchmark-section {
                 background: var(--card-bg);
                 padding: 20px;
                 border-radius: 8px;
                 margin-bottom: 20px;
+              }
+              
+              .chart-container {
+                width: 100%;
+                height: 500px;
+                margin: 20px 0;
               }
               
               table {
@@ -216,16 +273,19 @@ jobs:
               th {
                 background: var(--accent-color);
                 color: white;
+                position: sticky;
+                top: 0;
               }
               
               tr:hover {
                 background: rgba(233, 69, 96, 0.1);
               }
               
-              .method-embind_value_object { color: #4ecdc4; }
-              .method-embind_manual_val { color: #45b7d1; }
-              .method-json_memory_access { color: #f7dc6f; }
-              .method-msgpack_memory_access { color: #bb8fce; }
+              .table-container {
+                max-height: 600px;
+                overflow-y: auto;
+                border-radius: 8px;
+              }
               
               .raw-output {
                 background: #0d1117;
@@ -257,37 +317,60 @@ jobs:
                 height: 20px;
                 border-radius: 4px;
               }
+              
+              .metric-selector {
+                margin: 20px 0;
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+              }
+              
+              .metric-btn {
+                padding: 8px 16px;
+                background: var(--accent-color);
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: background 0.3s;
+              }
+              
+              .metric-btn:hover {
+                background: var(--highlight);
+              }
+              
+              .metric-btn.active {
+                background: var(--highlight);
+              }
             </style>
           </head>
           <body>
             <div class="container">
-              <h1>🚀 WebAssembly Data Transfer Benchmark</h1>
+              <h1>🚀 WebAssembly Data Transfer Benchmark Results</h1>
               
               <div class="info">
                 <p><strong>Description:</strong> Comparing methods of transferring data from C++ (WASM VM) to JavaScript</p>
                 <p id="timestamp"></p>
                 <p id="commit"></p>
+                <p id="iterations"></p>
               </div>
               
-              <div class="legend">
-                <div class="legend-item">
-                  <div class="legend-color" style="background: #4ecdc4;"></div>
-                  <span>embind_value_object</span>
+              <h2>💻 System Information</h2>
+              <div class="system-info" id="systemInfo"></div>
+              
+              <h2>📊 Performance Comparison</h2>
+              <div class="benchmark-section">
+                <p>Select metric to visualize:</p>
+                <div class="metric-selector">
+                  <button class="metric-btn active" data-metric="avg">Average (ms)</button>
+                  <button class="metric-btn" data-metric="median">Median (ms)</button>
+                  <button class="metric-btn" data-metric="min">Min (ms)</button>
+                  <button class="metric-btn" data-metric="p95">P95 (ms)</button>
                 </div>
-                <div class="legend-item">
-                  <div class="legend-color" style="background: #45b7d1;"></div>
-                  <span>embind_manual_val</span>
-                </div>
-                <div class="legend-item">
-                  <div class="legend-color" style="background: #f7dc6f;"></div>
-                  <span>json_memory_access (yyjson)</span>
-                </div>
-                <div class="legend-item">
-                  <div class="legend-color" style="background: #bb8fce;"></div>
-                  <span>msgpack_memory_access (msgpack-c)</span>
-                </div>
+                <div id="chartContainer" class="chart-container"></div>
               </div>
               
+              <h2>📈 Detailed Results</h2>
               <div id="benchmarks"></div>
               
               <h2>📋 Raw Output</h2>
@@ -295,13 +378,231 @@ jobs:
             </div>
             
             <script>
+              let benchmarkData = null;
+              let currentMetric = 'avg';
+              let chart = null;
+              
+              const methodColors = {
+                'embind_value_object': '#4ecdc4',
+                'embind_manual_val': '#45b7d1',
+                'json_memory_access': '#f7dc6f',
+                'msgpack_memory_access': '#bb8fce',
+                'typed_cstruct': '#ff6b6b'
+              };
+              
+              function initChart() {
+                const chartDom = document.getElementById('chartContainer');
+                chart = echarts.init(chartDom, 'dark');
+              }
+              
+              function updateChart(metric) {
+                if (!benchmarkData || !chart) return;
+                
+                // Collect all unique test names and methods
+                const testNames = new Set();
+                const methods = new Set();
+                const dataByMethod = {};
+                
+                benchmarkData.benchmarks.forEach(benchmark => {
+                  benchmark.tests.forEach(test => {
+                    const testKey = benchmark.name + ' - ' + test.test;
+                    testNames.add(testKey);
+                    methods.add(test.method);
+                    
+                    if (!dataByMethod[test.method]) {
+                      dataByMethod[test.method] = {};
+                    }
+                    dataByMethod[test.method][testKey] = test[metric];
+                  });
+                });
+                
+                const testNamesArray = Array.from(testNames);
+                const series = [];
+                
+                Array.from(methods).forEach(method => {
+                  const data = testNamesArray.map(testName => 
+                    dataByMethod[method][testName] || 0
+                  );
+                  
+                  series.push({
+                    name: method,
+                    type: 'bar',
+                    data: data,
+                    itemStyle: {
+                      color: methodColors[method] || '#95a5a6'
+                    }
+                  });
+                });
+                
+                const option = {
+                  tooltip: {
+                    trigger: 'axis',
+                    axisPointer: {
+                      type: 'shadow'
+                    }
+                  },
+                  legend: {
+                    data: Array.from(methods),
+                    textStyle: {
+                      color: '#eaeaea'
+                    },
+                    top: 10
+                  },
+                  grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '15%',
+                    top: '15%',
+                    containLabel: true
+                  },
+                  xAxis: {
+                    type: 'category',
+                    data: testNamesArray,
+                    axisLabel: {
+                      rotate: 45,
+                      color: '#eaeaea',
+                      interval: 0,
+                      fontSize: 10
+                    }
+                  },
+                  yAxis: {
+                    type: 'value',
+                    name: metric.toUpperCase() + ' (ms)',
+                    axisLabel: {
+                      color: '#eaeaea'
+                    },
+                    nameTextStyle: {
+                      color: '#eaeaea'
+                    }
+                  },
+                  series: series,
+                  dataZoom: [
+                    {
+                      type: 'slider',
+                      show: true,
+                      xAxisIndex: [0],
+                      start: 0,
+                      end: 100
+                    }
+                  ]
+                };
+                
+                chart.setOption(option);
+              }
+              
+              function renderTables(data) {
+                const container = document.getElementById('benchmarks');
+                container.innerHTML = '';
+                
+                data.benchmarks.forEach(benchmark => {
+                  const section = document.createElement('div');
+                  section.className = 'benchmark-section';
+                  
+                  const title = document.createElement('h3');
+                  title.textContent = benchmark.name;
+                  section.appendChild(title);
+                  
+                  // Group tests
+                  const grouped = {};
+                  benchmark.tests.forEach(test => {
+                    if (!grouped[test.test]) grouped[test.test] = [];
+                    grouped[test.test].push(test);
+                  });
+                  
+                  Object.keys(grouped).forEach(testName => {
+                    const testTitle = document.createElement('h4');
+                    testTitle.textContent = testName;
+                    section.appendChild(testTitle);
+                    
+                    const tableContainer = document.createElement('div');
+                    tableContainer.className = 'table-container';
+                    
+                    const table = document.createElement('table');
+                    table.innerHTML = `
+                      <thead>
+                        <tr>
+                          <th>Method</th>
+                          <th>Avg (ms)</th>
+                          <th>Median (ms)</th>
+                          <th>Min (ms)</th>
+                          <th>P95 (ms)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${grouped[testName].map(test => `
+                          <tr>
+                            <td>${test.method}</td>
+                            <td>${test.avg.toFixed(4)}</td>
+                            <td>${test.median.toFixed(4)}</td>
+                            <td>${test.min.toFixed(4)}</td>
+                            <td>${test.p95.toFixed(4)}</td>
+                          </tr>
+                        `).join('')}
+                      </tbody>
+                    `;
+                    
+                    tableContainer.appendChild(table);
+                    section.appendChild(tableContainer);
+                  });
+                  
+                  container.appendChild(section);
+                });
+              }
+              
+              function renderSystemInfo(sysInfo) {
+                const container = document.getElementById('systemInfo');
+                container.innerHTML = `
+                  <div class="system-info-item">
+                    <strong>Platform:</strong> ${sysInfo.platform} (${sysInfo.arch})
+                  </div>
+                  <div class="system-info-item">
+                    <strong>Node.js:</strong> ${sysInfo.nodeVersion}
+                  </div>
+                  <div class="system-info-item">
+                    <strong>CPU:</strong> ${sysInfo.cpuCores}x ${sysInfo.cpuModel}
+                  </div>
+                  <div class="system-info-item">
+                    <strong>Total Memory:</strong> ${sysInfo.totalMemoryGB} GB
+                  </div>
+                  <div class="system-info-item">
+                    <strong>Free Memory:</strong> ${sysInfo.freeMemoryGB} GB
+                  </div>
+                `;
+              }
+              
+              // Initialize chart
+              initChart();
+              
+              // Setup metric selector
+              document.querySelectorAll('.metric-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                  document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
+                  btn.classList.add('active');
+                  currentMetric = btn.dataset.metric;
+                  updateChart(currentMetric);
+                });
+              });
+              
+              // Load data
               fetch('benchmark-results.json')
                 .then(res => res.json())
                 .then(data => {
+                  benchmarkData = data;
+                  
                   document.getElementById('timestamp').innerHTML = 
                     '<strong>Run at:</strong> ' + new Date(data.timestamp).toLocaleString();
                   document.getElementById('commit').innerHTML = 
                     '<strong>Commit:</strong> ' + data.commit.substring(0, 8);
+                  document.getElementById('iterations').innerHTML = 
+                    '<strong>Iterations:</strong> ' + data.iterations + ' per benchmark';
+                  
+                  if (data.systemInfo) {
+                    renderSystemInfo(data.systemInfo);
+                  }
+                  
+                  renderTables(data);
+                  updateChart(currentMetric);
+                  
                   document.getElementById('rawOutput').textContent = data.rawOutput;
                 })
                 .catch(err => {
@@ -310,11 +611,10 @@ jobs:
                     '<p>Failed to load benchmark results. Check console for details.</p>';
                 });
               
-              fetch('benchmark-output.txt')
-                .then(res => res.text())
-                .then(text => {
-                  document.getElementById('rawOutput').textContent = text;
-                });
+              // Handle window resize
+              window.addEventListener('resize', () => {
+                if (chart) chart.resize();
+              });
             </script>
           </body>
           </html>
