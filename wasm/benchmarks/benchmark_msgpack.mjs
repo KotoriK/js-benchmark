@@ -33,7 +33,7 @@ export async function runMsgpackBenchmarks(iterations) {
 }
 
 async function runFlatObjectBenchmarks(msgpack, iterations) {
-    const benchmark = new Benchmark('Flat Object (C++ → JS) - MessagePack');
+    const benchmark = new Benchmark('Flat Object (C++ → JS)', 'MessagePack');
     
     for (const nameLen of [10, 100, 1000]) {
         const testName = `flat_nameLen${nameLen}`;
@@ -55,7 +55,7 @@ async function runFlatObjectBenchmarks(msgpack, iterations) {
 }
 
 async function runNestedObjectBenchmarks(msgpack, iterations) {
-    const benchmark = new Benchmark('Nested Object (C++ → JS) - MessagePack');
+    const benchmark = new Benchmark('Nested Object (C++ → JS)', 'MessagePack');
     
     for (const itemCount of [10, 50, 100]) {
         const testName = `nested_items${itemCount}`;
@@ -77,7 +77,7 @@ async function runNestedObjectBenchmarks(msgpack, iterations) {
 }
 
 async function runNumberArrayBenchmarks(msgpack, iterations) {
-    const benchmark = new Benchmark('Number Array (C++ → JS) - MessagePack');
+    const benchmark = new Benchmark('Number Array (C++ → JS)', 'MessagePack');
     
     for (const count of [100, 1000, 10000]) {
         const testName = `numbers_${count}`;
@@ -99,7 +99,7 @@ async function runNumberArrayBenchmarks(msgpack, iterations) {
 }
 
 async function runObjectArrayBenchmarks(msgpack, iterations) {
-    const benchmark = new Benchmark('Object Array (C++ → JS) - MessagePack');
+    const benchmark = new Benchmark('Object Array (C++ → JS)', 'MessagePack');
     
     for (const count of [10, 100, 500]) {
         const testName = `objects_${count}`;
@@ -121,7 +121,7 @@ async function runObjectArrayBenchmarks(msgpack, iterations) {
 }
 
 async function runTreeBenchmarks(msgpack, iterations) {
-    const benchmark = new Benchmark('Tree Structure (C++ → JS) - MessagePack');
+    const benchmark = new Benchmark('Tree Structure (C++ → JS)', 'MessagePack');
     
     for (const [depth, breadth] of [[3, 2], [4, 3], [5, 2]]) {
         const testName = `tree_d${depth}_b${breadth}`;

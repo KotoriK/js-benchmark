@@ -33,7 +33,7 @@ export async function runEmbindBenchmarks(iterations) {
 }
 
 async function runFlatObjectBenchmarks(embind, iterations) {
-    const benchmark = new Benchmark('Flat Object (C++ → JS) - embind');
+    const benchmark = new Benchmark('Flat Object (C++ → JS)', 'embind');
     
     for (const nameLen of [10, 100, 1000]) {
         const testName = `flat_nameLen${nameLen}`;
@@ -58,7 +58,7 @@ async function runFlatObjectBenchmarks(embind, iterations) {
 }
 
 async function runNestedObjectBenchmarks(embind, iterations) {
-    const benchmark = new Benchmark('Nested Object (C++ → JS) - embind');
+    const benchmark = new Benchmark('Nested Object (C++ → JS)', 'embind');
     
     for (const itemCount of [10, 50, 100]) {
         const testName = `nested_items${itemCount}`;
@@ -80,7 +80,7 @@ async function runNestedObjectBenchmarks(embind, iterations) {
 }
 
 async function runNumberArrayBenchmarks(embind, iterations) {
-    const benchmark = new Benchmark('Number Array (C++ → JS) - embind');
+    const benchmark = new Benchmark('Number Array (C++ → JS)', 'embind');
     
     for (const count of [100, 1000, 10000]) {
         const testName = `numbers_${count}`;
@@ -102,7 +102,7 @@ async function runNumberArrayBenchmarks(embind, iterations) {
 }
 
 async function runObjectArrayBenchmarks(embind, iterations) {
-    const benchmark = new Benchmark('Object Array (C++ → JS) - embind');
+    const benchmark = new Benchmark('Object Array (C++ → JS)', 'embind');
     
     for (const count of [10, 100, 500]) {
         const testName = `objects_${count}`;
@@ -124,7 +124,7 @@ async function runObjectArrayBenchmarks(embind, iterations) {
 }
 
 async function runTreeBenchmarks(embind, iterations) {
-    const benchmark = new Benchmark('Tree Structure (C++ → JS) - embind');
+    const benchmark = new Benchmark('Tree Structure (C++ → JS)', 'embind');
     
     for (const [depth, breadth] of [[3, 2], [4, 3], [5, 2]]) {
         const testName = `tree_d${depth}_b${breadth}`;

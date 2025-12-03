@@ -21,8 +21,9 @@ export const FLOAT64_BYTE_SIZE = 8;  // Size in bytes of a float64/double
  * Benchmark utilities
  */
 export class Benchmark {
-    constructor(name) {
+    constructor(name, benchmarkType = null) {
         this.name = name;
+        this.benchmarkType = benchmarkType;
         this.results = [];
     }
 
@@ -67,6 +68,9 @@ export class Benchmark {
     printResults() {
         console.log(`\n${'='.repeat(90)}`);
         console.log(`Benchmark Results: ${this.name}`);
+        if (this.benchmarkType) {
+            console.log(`Benchmark Type: ${this.benchmarkType}`);
+        }
         console.log('='.repeat(90));
         
         const grouped = {};

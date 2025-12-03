@@ -33,7 +33,7 @@ export async function runCStructBenchmarks(iterations) {
 }
 
 async function runFlatObjectBenchmarks(cstruct, iterations) {
-    const benchmark = new Benchmark('Flat Object (C++ → JS) - typed-cstruct');
+    const benchmark = new Benchmark('Flat Object (C++ → JS)', 'typed-cstruct');
     
     for (const nameLen of [10, 100, 1000]) {
         const testName = `flat_nameLen${nameLen}`;
@@ -70,7 +70,7 @@ async function runFlatObjectBenchmarks(cstruct, iterations) {
 }
 
 async function runNestedObjectBenchmarks(cstruct, iterations) {
-    const benchmark = new Benchmark('Nested Object (C++ → JS) - typed-cstruct');
+    const benchmark = new Benchmark('Nested Object (C++ → JS)', 'typed-cstruct');
     
     for (const itemCount of [10, 50, 100]) {
         const testName = `nested_items${itemCount}`;
@@ -119,7 +119,7 @@ async function runNestedObjectBenchmarks(cstruct, iterations) {
 }
 
 async function runNumberArrayBenchmarks(cstruct, iterations) {
-    const benchmark = new Benchmark('Number Array (C++ → JS) - typed-cstruct');
+    const benchmark = new Benchmark('Number Array (C++ → JS)', 'typed-cstruct');
     
     for (const count of [100, 1000, 10000]) {
         const testName = `numbers_${count}`;
@@ -154,7 +154,7 @@ async function runNumberArrayBenchmarks(cstruct, iterations) {
 }
 
 async function runObjectArrayBenchmarks(cstruct, iterations) {
-    const benchmark = new Benchmark('Object Array (C++ → JS) - typed-cstruct');
+    const benchmark = new Benchmark('Object Array (C++ → JS)', 'typed-cstruct');
     
     for (const count of [10, 100, 500]) {
         const testName = `objects_${count}`;
@@ -202,7 +202,7 @@ async function runObjectArrayBenchmarks(cstruct, iterations) {
 }
 
 async function runTreeBenchmarks(cstruct, iterations) {
-    const benchmark = new Benchmark('Tree Structure (C++ → JS) - typed-cstruct');
+    const benchmark = new Benchmark('Tree Structure (C++ → JS)', 'typed-cstruct');
     
     for (const [depth, breadth] of [[3, 2], [4, 3], [5, 2]]) {
         const testName = `tree_d${depth}_b${breadth}`;
