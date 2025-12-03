@@ -117,17 +117,25 @@ jobs:
           const lines = output.split('\n');
           let currentBenchmark = null;
           let currentTestName = 'unknown';
+          let currentBenchmarkType = null;
           let inResults = false;
           
           for (const line of lines) {
             if (line.startsWith('Benchmark Results:')) {
               currentBenchmark = {
                 name: line.replace('Benchmark Results:', '').trim(),
+                benchmarkType: null,
                 tests: []
               };
               results.benchmarks.push(currentBenchmark);
               inResults = false;
               currentTestName = 'unknown';
+              currentBenchmarkType = null;
+            } else if (line.startsWith('Benchmark Type:')) {
+              currentBenchmarkType = line.replace('Benchmark Type:', '').trim();
+              if (currentBenchmark) {
+                currentBenchmark.benchmarkType = currentBenchmarkType;
+              }
             } else if (line.includes('Method') && line.includes('Avg')) {
               inResults = true;
             } else if (line.endsWith(':') && !line.includes('Benchmark') && !line.startsWith('-') && !line.startsWith('=')) {
@@ -147,6 +155,7 @@ jobs:
                   currentBenchmark.tests.push({
                     test: currentTestName,
                     method: method,
+                    benchmarkType: currentBenchmarkType,
                     avg: avg,
                     median: median,
                     min: min,
@@ -345,6 +354,11 @@ jobs:
               .metric-btn.active {
                 background: var(--highlight);
               }
+              
+              .best-result {
+                font-weight: bold;
+                color: #4ecdc4;
+              }
             </style>
           </head>
           <body>
@@ -363,7 +377,13 @@ jobs:
               
               <h2>📊 Performance Comparison</h2>
               <div class="benchmark-section">
-                <p>Select metric to visualize:</p>
+                <p>Filter by test category:</p>
+                <div class="metric-selector">
+                  <select id="testFilter" class="metric-btn" style="min-width: 250px;">
+                    <option value="all">All Tests</option>
+                  </select>
+                </div>
+                <p style="margin-top: 20px;">Select metric to visualize:</p>
                 <div class="metric-selector">
                   <button class="metric-btn active" data-metric="avg">Average (ms)</button>
                   <button class="metric-btn" data-metric="median">Median (ms)</button>
@@ -383,6 +403,7 @@ jobs:
             <script>
               let benchmarkData = null;
               let currentMetric = 'avg';
+              let currentFilter = 'all';
               let chart = null;
               
               const methodColors = {
@@ -401,12 +422,17 @@ jobs:
               function updateChart(metric) {
                 if (!benchmarkData || !chart) return;
                 
-                // Collect all unique test names and methods
+                // Collect all unique test names and methods, filtered by current filter
                 const testNames = new Set();
                 const methods = new Set();
                 const dataByMethod = {};
                 
                 benchmarkData.benchmarks.forEach(benchmark => {
+                  // Skip if filter is active and doesn't match
+                  if (currentFilter !== 'all' && benchmark.name !== currentFilter) {
+                    return;
+                  }
+                  
                   benchmark.tests.forEach(test => {
                     const testKey = benchmark.name + ' - ' + test.test;
                     testNames.add(testKey);
@@ -503,6 +529,9 @@ jobs:
                   
                   const title = document.createElement('h3');
                   title.textContent = benchmark.name;
+                  if (benchmark.benchmarkType) {
+                    title.textContent += ' - ' + benchmark.benchmarkType;
+                  }
                   section.appendChild(title);
                   
                   // Group tests
@@ -520,6 +549,14 @@ jobs:
                     const tableContainer = document.createElement('div');
                     tableContainer.className = 'table-container';
                     
+                    const tests = grouped[testName];
+                    
+                    // Find best (minimum) values for each metric
+                    const bestAvg = Math.min(...tests.map(t => t.avg));
+                    const bestMedian = Math.min(...tests.map(t => t.median));
+                    const bestMin = Math.min(...tests.map(t => t.min));
+                    const bestP95 = Math.min(...tests.map(t => t.p95));
+                    
                     const table = document.createElement('table');
                     table.innerHTML = `
                       <thead>
@@ -532,13 +569,13 @@ jobs:
                         </tr>
                       </thead>
                       <tbody>
-                        ${grouped[testName].map(test => `
+                        ${tests.map(test => `
                           <tr>
                             <td>${test.method}</td>
-                            <td>${test.avg.toFixed(4)}</td>
-                            <td>${test.median.toFixed(4)}</td>
-                            <td>${test.min.toFixed(4)}</td>
-                            <td>${test.p95.toFixed(4)}</td>
+                            <td class="${test.avg === bestAvg ? 'best-result' : ''}">${test.avg.toFixed(4)}</td>
+                            <td class="${test.median === bestMedian ? 'best-result' : ''}">${test.median.toFixed(4)}</td>
+                            <td class="${test.min === bestMin ? 'best-result' : ''}">${test.min.toFixed(4)}</td>
+                            <td class="${test.p95 === bestP95 ? 'best-result' : ''}">${test.p95.toFixed(4)}</td>
                           </tr>
                         `).join('')}
                       </tbody>
@@ -586,11 +623,31 @@ jobs:
                 });
               });
               
+              // Setup test filter
+              document.getElementById('testFilter').addEventListener('change', (e) => {
+                currentFilter = e.target.value;
+                updateChart(currentMetric);
+              });
+              
               // Load data
               fetch('benchmark-results.json')
                 .then(res => res.json())
                 .then(data => {
                   benchmarkData = data;
+                  
+                  // Populate filter dropdown with unique test categories
+                  const testCategories = new Set();
+                  data.benchmarks.forEach(benchmark => {
+                    testCategories.add(benchmark.name);
+                  });
+                  
+                  const filterSelect = document.getElementById('testFilter');
+                  Array.from(testCategories).sort().forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    option.textContent = category;
+                    filterSelect.appendChild(option);
+                  });
                   
                   document.getElementById('timestamp').innerHTML = 
                     '<strong>Run at:</strong> ' + new Date(data.timestamp).toLocaleString();

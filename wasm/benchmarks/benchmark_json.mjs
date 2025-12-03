@@ -32,7 +32,7 @@ export async function runJsonBenchmarks(iterations) {
 }
 
 async function runFlatObjectBenchmarks(json, iterations) {
-    const benchmark = new Benchmark('Flat Object (C++ → JS) - JSON');
+    const benchmark = new Benchmark('Flat Object (C++ → JS)', 'JSON');
     
     for (const nameLen of [10, 100, 1000]) {
         const testName = `flat_nameLen${nameLen}`;
@@ -52,7 +52,7 @@ async function runFlatObjectBenchmarks(json, iterations) {
 }
 
 async function runNestedObjectBenchmarks(json, iterations) {
-    const benchmark = new Benchmark('Nested Object (C++ → JS) - JSON');
+    const benchmark = new Benchmark('Nested Object (C++ → JS)', 'JSON');
     
     for (const itemCount of [10, 50, 100]) {
         const testName = `nested_items${itemCount}`;
@@ -72,7 +72,7 @@ async function runNestedObjectBenchmarks(json, iterations) {
 }
 
 async function runNumberArrayBenchmarks(json, iterations) {
-    const benchmark = new Benchmark('Number Array (C++ → JS) - JSON');
+    const benchmark = new Benchmark('Number Array (C++ → JS)', 'JSON');
     
     for (const count of [100, 1000, 10000]) {
         const testName = `numbers_${count}`;
@@ -92,7 +92,7 @@ async function runNumberArrayBenchmarks(json, iterations) {
 }
 
 async function runObjectArrayBenchmarks(json, iterations) {
-    const benchmark = new Benchmark('Object Array (C++ → JS) - JSON');
+    const benchmark = new Benchmark('Object Array (C++ → JS)', 'JSON');
     
     for (const count of [10, 100, 500]) {
         const testName = `objects_${count}`;
@@ -112,7 +112,7 @@ async function runObjectArrayBenchmarks(json, iterations) {
 }
 
 async function runTreeBenchmarks(json, iterations) {
-    const benchmark = new Benchmark('Tree Structure (C++ → JS) - JSON');
+    const benchmark = new Benchmark('Tree Structure (C++ → JS)', 'JSON');
     
     for (const [depth, breadth] of [[3, 2], [4, 3], [5, 2]]) {
         const testName = `tree_d${depth}_b${breadth}`;
