@@ -20,6 +20,7 @@ import { runEmbindBenchmarks } from './benchmarks/benchmark_embind.mjs';
 import { runJsonBenchmarks } from './benchmarks/benchmark_json.mjs';
 import { runMsgpackBenchmarks } from './benchmarks/benchmark_msgpack.mjs';
 import { runCStructBenchmarks } from './benchmarks/benchmark_cstruct.mjs';
+import { getSystemInfo } from './benchmarks/utils.mjs';
 
 async function main() {
     console.log('WebAssembly Data Transfer Benchmark');
@@ -28,6 +29,14 @@ async function main() {
     
     const iterations = parseInt(process.env.ITERATIONS || '100', 10);
     console.log(`Running ${iterations} iterations per benchmark...\n`);
+
+    // Display system information
+    const sysInfo = getSystemInfo();
+    console.log('System Information:');
+    console.log(`  Platform: ${sysInfo.platform} (${sysInfo.arch})`);
+    console.log(`  Node.js: ${sysInfo.nodeVersion}`);
+    console.log(`  CPU: ${sysInfo.cpuCores}x ${sysInfo.cpuModel}`);
+    console.log(`  Memory: ${sysInfo.totalMemoryGB} GB total, ${sysInfo.freeMemoryGB} GB free\n`);
 
     console.log('Loading WebAssembly modules...\n');
     

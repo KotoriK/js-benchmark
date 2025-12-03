@@ -8,6 +8,7 @@ import { createRequire } from 'module';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
+import os from 'os';
 
 export const require = createRequire(import.meta.url);
 export const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -105,4 +106,20 @@ export class Benchmark {
 export async function loadWasmModule(createFn, wasmPath) {
     const wasmBinary = readFileSync(wasmPath);
     return await createFn({ wasmBinary });
+}
+
+/**
+ * Get system information for benchmark context
+ */
+export function getSystemInfo() {
+    const cpus = os.cpus();
+    return {
+        platform: process.platform,
+        arch: process.arch,
+        nodeVersion: process.version,
+        cpuModel: cpus[0]?.model || 'Unknown',
+        cpuCores: cpus.length,
+        totalMemoryGB: (os.totalmem() / 1024 / 1024 / 1024).toFixed(2),
+        freeMemoryGB: (os.freemem() / 1024 / 1024 / 1024).toFixed(2)
+    };
 }
