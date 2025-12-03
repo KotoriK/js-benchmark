@@ -359,6 +359,17 @@ jobs:
                 font-weight: bold;
                 color: #4ecdc4;
               }
+              
+              td a {
+                color: #4ecdc4;
+                text-decoration: none;
+                border-bottom: 1px dotted #4ecdc4;
+              }
+              
+              td a:hover {
+                color: #e94560;
+                border-bottom-color: #e94560;
+              }
             </style>
           </head>
           <body>
@@ -519,6 +530,84 @@ jobs:
                 chart.setOption(option);
               }
               
+              function getSourceCodeLink(benchmarkType, testName, method) {
+                const commit = benchmarkData.commit || 'main';
+                const baseUrl = 'https://github.com/KotoriK/js-benchmark/blob/' + commit;
+                
+                // Map benchmark types to files and line ranges
+                const fileMap = {
+                  'embind': 'wasm/benchmarks/benchmark_embind.mjs',
+                  'JSON': 'wasm/benchmarks/benchmark_json.mjs',
+                  'MessagePack': 'wasm/benchmarks/benchmark_msgpack.mjs',
+                  'typed-cstruct': 'wasm/benchmarks/benchmark_cstruct.mjs'
+                };
+                
+                const file = fileMap[benchmarkType];
+                if (!file) return null;
+                
+                // Line numbers are manually mapped to benchmark method calls
+                // Note: These may become outdated if source files are modified
+                // Consider updating these mappings when benchmark files change
+                let lineNumber = 1;
+                
+                // For embind, we have two methods: value_object and manual_val
+                if (benchmarkType === 'embind') {
+                  const isFirstMethod = (method === 'embind_value_object');
+                  if (testName.startsWith('flat_')) {
+                    lineNumber = isFirstMethod ? 43 : 51;
+                  } else if (testName.startsWith('nested_')) {
+                    lineNumber = isFirstMethod ? 67 : 73;
+                  } else if (testName.startsWith('numbers_')) {
+                    lineNumber = isFirstMethod ? 89 : 95;
+                  } else if (testName.startsWith('objects_')) {
+                    lineNumber = isFirstMethod ? 111 : 117;
+                  } else if (testName.startsWith('tree_')) {
+                    lineNumber = isFirstMethod ? 133 : 139;
+                  }
+                } else if (benchmarkType === 'JSON') {
+                  // JSON has only one method (json_memory_access)
+                  if (testName.startsWith('flat_')) {
+                    lineNumber = 43;
+                  } else if (testName.startsWith('nested_')) {
+                    lineNumber = 63;
+                  } else if (testName.startsWith('numbers_')) {
+                    lineNumber = 83;
+                  } else if (testName.startsWith('objects_')) {
+                    lineNumber = 103;
+                  } else if (testName.startsWith('tree_')) {
+                    lineNumber = 123;
+                  }
+                } else if (benchmarkType === 'MessagePack') {
+                  // MessagePack has only one method (msgpack_memory_access)
+                  if (testName.startsWith('flat_')) {
+                    lineNumber = 45;
+                  } else if (testName.startsWith('nested_')) {
+                    lineNumber = 67;
+                  } else if (testName.startsWith('numbers_')) {
+                    lineNumber = 89;
+                  } else if (testName.startsWith('objects_')) {
+                    lineNumber = 111;
+                  } else if (testName.startsWith('tree_')) {
+                    lineNumber = 133;
+                  }
+                } else if (benchmarkType === 'typed-cstruct') {
+                  // typed-cstruct has only one method
+                  if (testName.startsWith('flat_')) {
+                    lineNumber = 53;
+                  } else if (testName.startsWith('nested_')) {
+                    lineNumber = 90;
+                  } else if (testName.startsWith('numbers_')) {
+                    lineNumber = 134;
+                  } else if (testName.startsWith('objects_')) {
+                    lineNumber = 174;
+                  } else if (testName.startsWith('tree_')) {
+                    lineNumber = 241;
+                  }
+                }
+                
+                return baseUrl + '/' + file + '#L' + lineNumber;
+              }
+              
               function renderTables(data) {
                 const container = document.getElementById('benchmarks');
                 container.innerHTML = '';
@@ -534,56 +623,72 @@ jobs:
                   }
                   section.appendChild(title);
                   
-                  // Group tests
-                  const grouped = {};
+                  // Group by method first (merge series by method)
+                  const byMethod = {};
                   benchmark.tests.forEach(test => {
-                    if (!grouped[test.test]) grouped[test.test] = [];
-                    grouped[test.test].push(test);
+                    if (!byMethod[test.method]) byMethod[test.method] = [];
+                    byMethod[test.method].push(test);
                   });
                   
-                  Object.keys(grouped).forEach(testName => {
-                    const testTitle = document.createElement('h4');
-                    testTitle.textContent = testName;
-                    section.appendChild(testTitle);
+                  // Get all unique test names for columns
+                  const allTestNames = [...new Set(benchmark.tests.map(t => t.test))].sort();
+                  
+                  // Create a single comprehensive table grouped by method
+                  const tableContainer = document.createElement('div');
+                  tableContainer.className = 'table-container';
+                  
+                  const table = document.createElement('table');
+                  let tableHTML = `
+                    <thead>
+                      <tr>
+                        <th>Method</th>
+                        ${allTestNames.map(testName => `<th>${testName}</th>`).join('')}
+                      </tr>
+                    </thead>
+                    <tbody>
+                  `;
+                  
+                  // For each method, create a row with all test results
+                  Object.keys(byMethod).sort().forEach(method => {
+                    const tests = byMethod[method];
+                    const testMap = {};
+                    tests.forEach(t => testMap[t.test] = t);
                     
-                    const tableContainer = document.createElement('div');
-                    tableContainer.className = 'table-container';
+                    tableHTML += '<tr>';
                     
-                    const tests = grouped[testName];
+                    // Method name with source code link
+                    const firstTest = tests[0];
+                    const sourceLink = getSourceCodeLink(benchmark.benchmarkType, firstTest.test, method);
+                    if (sourceLink) {
+                      tableHTML += `<td><a href="${sourceLink}" target="_blank" style="color: #4ecdc4; text-decoration: none;">${method}</a></td>`;
+                    } else {
+                      tableHTML += `<td>${method}</td>`;
+                    }
                     
-                    // Find best (minimum) values for each metric
-                    const bestAvg = Math.min(...tests.map(t => t.avg));
-                    const bestMedian = Math.min(...tests.map(t => t.median));
-                    const bestMin = Math.min(...tests.map(t => t.min));
-                    const bestP95 = Math.min(...tests.map(t => t.p95));
+                    // Test results
+                    allTestNames.forEach(testName => {
+                      const test = testMap[testName];
+                      if (test) {
+                        // Find best (minimum) values across all methods for this test
+                        const allMethodsForTest = benchmark.tests.filter(t => t.test === testName);
+                        const bestAvg = Math.min(...allMethodsForTest.map(t => t.avg));
+                        
+                        const isBest = test.avg === bestAvg;
+                        const cellClass = isBest ? 'best-result' : '';
+                        tableHTML += `<td class="${cellClass}">${test.avg.toFixed(4)}</td>`;
+                      } else {
+                        tableHTML += '<td>-</td>';
+                      }
+                    });
                     
-                    const table = document.createElement('table');
-                    table.innerHTML = `
-                      <thead>
-                        <tr>
-                          <th>Method</th>
-                          <th>Avg (ms)</th>
-                          <th>Median (ms)</th>
-                          <th>Min (ms)</th>
-                          <th>P95 (ms)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        ${tests.map(test => `
-                          <tr>
-                            <td>${test.method}</td>
-                            <td class="${test.avg === bestAvg ? 'best-result' : ''}">${test.avg.toFixed(4)}</td>
-                            <td class="${test.median === bestMedian ? 'best-result' : ''}">${test.median.toFixed(4)}</td>
-                            <td class="${test.min === bestMin ? 'best-result' : ''}">${test.min.toFixed(4)}</td>
-                            <td class="${test.p95 === bestP95 ? 'best-result' : ''}">${test.p95.toFixed(4)}</td>
-                          </tr>
-                        `).join('')}
-                      </tbody>
-                    `;
-                    
-                    tableContainer.appendChild(table);
-                    section.appendChild(tableContainer);
+                    tableHTML += '</tr>';
                   });
+                  
+                  tableHTML += '</tbody>';
+                  table.innerHTML = tableHTML;
+                  
+                  tableContainer.appendChild(table);
+                  section.appendChild(tableContainer);
                   
                   container.appendChild(section);
                 });
