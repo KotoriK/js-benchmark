@@ -17,6 +17,9 @@ const repoRoot = join(__dirname, '..', '..');
 const genericDir = join(repoRoot, 'generic');
 const captureConsole = join(__dirname, 'capture-console.cjs');
 
+/** Maximum milliseconds to wait for a single benchmark script to complete. */
+const SCRIPT_TIMEOUT_MS = 180_000;
+
 const scripts = readdirSync(genericDir)
     .filter(f => f.endsWith('.js'))
     .sort();
@@ -34,7 +37,7 @@ for (const script of scripts) {
     try {
         execFileSync(process.execPath, ['--require', captureConsole, scriptPath], {
             env: { ...process.env, BENCHMARK_OUTPUT_FILE: outFile },
-            timeout: 180000,
+            timeout: SCRIPT_TIMEOUT_MS,
             stdio: ['ignore', 'inherit', 'pipe'],
         });
 
