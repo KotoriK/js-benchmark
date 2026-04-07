@@ -12,23 +12,11 @@
  *   index.html           – report page (copied from index-template.html)
  */
 
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync } from 'fs';
+import { join } from 'path';
+import { scriptsDir, repoRoot, tryReadJson } from './utils.mjs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const repoRoot  = join(__dirname, '..', '..');
 const publicDir = join(repoRoot, 'public');
-
-function tryReadJson(path) {
-    if (!existsSync(path)) return null;
-    try {
-        return JSON.parse(readFileSync(path, 'utf8'));
-    } catch (err) {
-        console.warn(`Warning: Failed to parse ${path}: ${err.message}`);
-        return null;
-    }
-}
 
 const genericResults = tryReadJson(join(repoRoot, 'generic-results.json'));
 const domResults     = tryReadJson(join(repoRoot, 'dom-results.json'));
@@ -79,6 +67,9 @@ if (wasmResults) {
 // ---------------------------------------------------------------------------
 // Write output files
 // ---------------------------------------------------------------------------
+if (existsSync(publicDir)) {
+    rmSync(publicDir, { recursive: true, force: true });
+}
 mkdirSync(publicDir, { recursive: true });
 
 writeFileSync(
@@ -87,7 +78,7 @@ writeFileSync(
 );
 console.log('Written: public/benchmark-data.json');
 
-const templatePath = join(__dirname, 'index-template.html');
+const templatePath = join(scriptsDir, 'index-template.html');
 writeFileSync(join(publicDir, 'index.html'), readFileSync(templatePath, 'utf8'));
 console.log('Written: public/index.html');
 
