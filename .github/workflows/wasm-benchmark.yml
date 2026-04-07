@@ -1,16 +1,10 @@
-name: WASM Benchmark
+name: Benchmark
 
 on:
   push:
     branches: [main, master]
-    paths:
-      - 'wasm/**'
-      - '.github/workflows/wasm-benchmark.yml'
   pull_request:
     branches: [main, master]
-    paths:
-      - 'wasm/**'
-      - '.github/workflows/wasm-benchmark.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,9 +17,64 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-and-benchmark:
+  # ─────────────────────────────────────────────
+  # 1. Generic JavaScript benchmarks
+  # ─────────────────────────────────────────────
+  benchmark-generic:
     runs-on: ubuntu-latest
-    
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run generic benchmarks
+        run: node .github/scripts/run-generic-benchmarks.mjs
+
+      - name: Upload generic results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-generic
+          path: generic-results.json
+
+  # ─────────────────────────────────────────────
+  # 2. DOM benchmarks (jsdom)
+  # ─────────────────────────────────────────────
+  benchmark-dom:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install script dependencies
+        working-directory: .github/scripts
+        run: npm install
+
+      - name: Run DOM benchmarks
+        run: node .github/scripts/run-dom-benchmarks.mjs
+
+      - name: Upload DOM results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-dom
+          path: dom-results.json
+
+  # ─────────────────────────────────────────────
+  # 3. WebAssembly benchmarks
+  # ─────────────────────────────────────────────
+  benchmark-wasm:
+    runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -40,9 +89,6 @@ jobs:
         with:
           version: 'latest'
 
-      - name: Verify Emscripten
-        run: emcc --version
-
       - name: Install Node.js dependencies
         working-directory: ./wasm
         run: npm ci
@@ -55,740 +101,63 @@ jobs:
           emcmake cmake ..
           emmake make -j$(nproc)
 
-      - name: Run benchmarks
-        id: benchmark
+      - name: Run WASM benchmarks
         working-directory: ./wasm
-        run: |
-          # Run benchmark with 200 iterations for stable results
-          ITERATIONS=200 node benchmark.mjs > benchmark-output.txt 2>&1
-          cat benchmark-output.txt
-          
-          # Create JSON output for GitHub Pages
-          node -e "
-          const fs = require('fs');
-          const os = require('os');
-          const output = fs.readFileSync('benchmark-output.txt', 'utf8');
-          
-          // Parse system information from output
-          let systemInfo = {
-            platform: 'unknown',
-            arch: 'unknown',
-            nodeVersion: 'unknown',
-            cpuModel: 'unknown',
-            cpuCores: 0,
-            totalMemoryGB: '0',
-            freeMemoryGB: '0'
-          };
-          
-          const sysInfoMatch = output.match(/System Information:[\s\S]*?(?=Loading WebAssembly modules|$)/);
-          if (sysInfoMatch) {
-            const sysText = sysInfoMatch[0];
-            const platformMatch = sysText.match(/Platform:\s*([^\(]+)\(([^\)]+)\)/);
-            const nodeMatch = sysText.match(/Node\.js:\s*([^\n]+)/);
-            const cpuMatch = sysText.match(/CPU:\s*(\d+)x\s*([^\n]+)/);
-            const memMatch = sysText.match(/Memory:\s*([\d.]+)\s*GB total,\s*([\d.]+)\s*GB free/);
-            
-            if (platformMatch) {
-              systemInfo.platform = platformMatch[1].trim();
-              systemInfo.arch = platformMatch[2].trim();
-            }
-            if (nodeMatch) systemInfo.nodeVersion = nodeMatch[1].trim();
-            if (cpuMatch) {
-              systemInfo.cpuCores = parseInt(cpuMatch[1]);
-              systemInfo.cpuModel = cpuMatch[2].trim();
-            }
-            if (memMatch) {
-              systemInfo.totalMemoryGB = memMatch[1];
-              systemInfo.freeMemoryGB = memMatch[2];
-            }
-          }
-          
-          const results = {
-            timestamp: new Date().toISOString(),
-            commit: process.env.GITHUB_SHA || 'local',
-            ref: process.env.GITHUB_REF || 'local',
-            iterations: parseInt(process.env.ITERATIONS || '200', 10),
-            systemInfo: systemInfo,
-            rawOutput: output,
-            benchmarks: []
-          };
-          
-          // Parse benchmark results
-          const lines = output.split('\n');
-          let currentBenchmark = null;
-          let currentTestName = 'unknown';
-          let currentBenchmarkType = null;
-          let inResults = false;
-          
-          for (const line of lines) {
-            if (line.startsWith('Benchmark Results:')) {
-              currentBenchmark = {
-                name: line.replace('Benchmark Results:', '').trim(),
-                benchmarkType: null,
-                tests: []
-              };
-              results.benchmarks.push(currentBenchmark);
-              inResults = false;
-              currentTestName = 'unknown';
-              currentBenchmarkType = null;
-            } else if (line.startsWith('Benchmark Type:')) {
-              currentBenchmarkType = line.replace('Benchmark Type:', '').trim();
-              if (currentBenchmark) {
-                currentBenchmark.benchmarkType = currentBenchmarkType;
-              }
-            } else if (line.includes('Method') && line.includes('Avg')) {
-              inResults = true;
-            } else if (line.endsWith(':') && !line.includes('Benchmark') && !line.startsWith('-') && !line.startsWith('=')) {
-              // This is a test name line (e.g., 'flat_nameLen10:')
-              currentTestName = line.replace(':', '').trim();
-              inResults = false;
-            } else if (inResults && line.trim() && !line.startsWith('-') && !line.startsWith('=')) {
-              const parts = line.trim().split(/\s+/);
-              if (parts.length >= 5) {
-                const method = parts[0];
-                const avg = parseFloat(parts[1]);
-                const median = parseFloat(parts[2]);
-                const min = parseFloat(parts[3]);
-                const p95 = parseFloat(parts[4]);
-                
-                if (!isNaN(avg) && currentBenchmark) {
-                  currentBenchmark.tests.push({
-                    test: currentTestName,
-                    method: method,
-                    benchmarkType: currentBenchmarkType,
-                    avg: avg,
-                    median: median,
-                    min: min,
-                    p95: p95
-                  });
-                }
-              }
-            }
-          }
-          
-          fs.writeFileSync('benchmark-results.json', JSON.stringify(results, null, 2));
-          console.log('Results saved to benchmark-results.json');
-          "
+        run: ITERATIONS=200 node benchmark.mjs > benchmark-output.txt 2>&1
+        env:
+          ITERATIONS: 200
 
-      - name: Upload benchmark artifacts
+      - name: Parse WASM benchmark output
+        run: node .github/scripts/parse-wasm-output.mjs wasm/benchmark-output.txt wasm-results.json
+
+      - name: Upload WASM results
         uses: actions/upload-artifact@v4
         with:
-          name: benchmark-results
+          name: benchmark-results-wasm
           path: |
+            wasm-results.json
             wasm/benchmark-output.txt
-            wasm/benchmark-results.json
+
+  # ─────────────────────────────────────────────
+  # 4. Generate unified GitHub Pages report
+  # ─────────────────────────────────────────────
+  generate-pages:
+    needs: [benchmark-generic, benchmark-dom, benchmark-wasm]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download generic results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results-generic
+          path: .
+        continue-on-error: true
+
+      - name: Download DOM results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results-dom
+          path: .
+        continue-on-error: true
+
+      - name: Download WASM results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results-wasm
+          path: .
+        continue-on-error: true
 
       - name: Generate GitHub Pages content
-        run: |
-          mkdir -p public
-          
-          # Copy benchmark results
-          cp wasm/benchmark-results.json public/
-          cp wasm/benchmark-output.txt public/
-          
-          # Create index.html with Apache ECharts
-          cat > public/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>WASM Benchmark Results</title>
-            <!-- ECharts 5.5.0 from jsDelivr CDN -->
-            <!-- TODO: Add SRI integrity hash after verifying from https://www.srihash.org/ -->
-            <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" 
-                    crossorigin="anonymous"></script>
-            <style>
-              :root {
-                --bg-color: #1a1a2e;
-                --card-bg: #16213e;
-                --text-color: #eaeaea;
-                --accent-color: #0f3460;
-                --highlight: #e94560;
-              }
-              
-              body {
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-                background: var(--bg-color);
-                color: var(--text-color);
-                margin: 0;
-                padding: 20px;
-                line-height: 1.6;
-              }
-              
-              .container {
-                max-width: 1400px;
-                margin: 0 auto;
-              }
-              
-              h1 {
-                color: var(--highlight);
-                border-bottom: 2px solid var(--highlight);
-                padding-bottom: 10px;
-              }
-              
-              h2 {
-                color: var(--text-color);
-                margin-top: 30px;
-              }
-              
-              .info {
-                background: var(--card-bg);
-                padding: 15px;
-                border-radius: 8px;
-                margin-bottom: 20px;
-              }
-              
-              .info p {
-                margin: 5px 0;
-              }
-              
-              .system-info {
-                background: var(--card-bg);
-                padding: 15px;
-                border-radius: 8px;
-                margin-bottom: 20px;
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 10px;
-              }
-              
-              .system-info-item {
-                padding: 8px;
-              }
-              
-              .benchmark-section {
-                background: var(--card-bg);
-                padding: 20px;
-                border-radius: 8px;
-                margin-bottom: 20px;
-              }
-              
-              .chart-container {
-                width: 100%;
-                height: 500px;
-                margin: 20px 0;
-              }
-              
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 15px;
-              }
-              
-              th, td {
-                padding: 12px;
-                text-align: left;
-                border-bottom: 1px solid var(--accent-color);
-              }
-              
-              th {
-                background: var(--accent-color);
-                color: white;
-                position: sticky;
-                top: 0;
-              }
-              
-              tr:hover {
-                background: rgba(233, 69, 96, 0.1);
-              }
-              
-              .table-container {
-                max-height: 600px;
-                overflow-y: auto;
-                border-radius: 8px;
-              }
-              
-              .raw-output {
-                background: #0d1117;
-                padding: 20px;
-                border-radius: 8px;
-                overflow-x: auto;
-                font-family: 'Courier New', monospace;
-                font-size: 13px;
-                white-space: pre;
-                max-height: 600px;
-                overflow-y: auto;
-              }
-              
-              .legend {
-                display: flex;
-                gap: 20px;
-                flex-wrap: wrap;
-                margin: 20px 0;
-              }
-              
-              .legend-item {
-                display: flex;
-                align-items: center;
-                gap: 8px;
-              }
-              
-              .legend-color {
-                width: 20px;
-                height: 20px;
-                border-radius: 4px;
-              }
-              
-              .metric-selector {
-                margin: 20px 0;
-                display: flex;
-                gap: 10px;
-                flex-wrap: wrap;
-              }
-              
-              .metric-btn {
-                padding: 8px 16px;
-                background: var(--accent-color);
-                color: white;
-                border: none;
-                border-radius: 4px;
-                cursor: pointer;
-                transition: background 0.3s;
-              }
-              
-              .metric-btn:hover {
-                background: var(--highlight);
-              }
-              
-              .metric-btn.active {
-                background: var(--highlight);
-              }
-              
-              .best-result {
-                font-weight: bold;
-                color: #4ecdc4;
-              }
-              
-              td a {
-                color: #4ecdc4;
-                text-decoration: none;
-                border-bottom: 1px dotted #4ecdc4;
-              }
-              
-              td a:hover {
-                color: #e94560;
-                border-bottom-color: #e94560;
-              }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <h1>🚀 WebAssembly Data Transfer Benchmark Results</h1>
-              
-              <div class="info">
-                <p><strong>Description:</strong> Comparing methods of transferring data from C++ (WASM VM) to JavaScript</p>
-                <p id="timestamp"></p>
-                <p id="commit"></p>
-                <p id="iterations"></p>
-              </div>
-              
-              <h2>💻 System Information</h2>
-              <div class="system-info" id="systemInfo"></div>
-              
-              <h2>📊 Performance Comparison</h2>
-              <div class="benchmark-section">
-                <p>Filter by test category:</p>
-                <div class="metric-selector">
-                  <select id="testFilter" class="metric-btn" style="min-width: 250px;">
-                    <option value="all">All Tests</option>
-                  </select>
-                </div>
-                <p style="margin-top: 20px;">Select metric to visualize:</p>
-                <div class="metric-selector">
-                  <button class="metric-btn active" data-metric="avg">Average (ms)</button>
-                  <button class="metric-btn" data-metric="median">Median (ms)</button>
-                  <button class="metric-btn" data-metric="min">Min (ms)</button>
-                  <button class="metric-btn" data-metric="p95">P95 (ms)</button>
-                </div>
-                <div id="chartContainer" class="chart-container"></div>
-              </div>
-              
-              <h2>📈 Detailed Results</h2>
-              <div id="benchmarks"></div>
-              
-              <h2>📋 Raw Output</h2>
-              <div class="raw-output" id="rawOutput"></div>
-            </div>
-            
-            <script>
-              let benchmarkData = null;
-              let currentMetric = 'avg';
-              let currentFilter = 'all';
-              let chart = null;
-              
-              const methodColors = {
-                'embind_value_object': '#4ecdc4',
-                'embind_manual_val': '#45b7d1',
-                'json_memory_access': '#f7dc6f',
-                'msgpack_memory_access': '#bb8fce',
-                'typed_cstruct': '#ff6b6b'
-              };
-              
-              function initChart() {
-                const chartDom = document.getElementById('chartContainer');
-                chart = echarts.init(chartDom, 'dark');
-              }
-              
-              function updateChart(metric) {
-                if (!benchmarkData || !chart) return;
-                
-                // Collect all unique test names and methods, filtered by current filter
-                const testNames = new Set();
-                const methods = new Set();
-                const dataByMethod = {};
-                
-                benchmarkData.benchmarks.forEach(benchmark => {
-                  // Skip if filter is active and doesn't match
-                  if (currentFilter !== 'all' && benchmark.name !== currentFilter) {
-                    return;
-                  }
-                  
-                  benchmark.tests.forEach(test => {
-                    const testKey = benchmark.name + ' - ' + test.test;
-                    testNames.add(testKey);
-                    methods.add(test.method);
-                    
-                    if (!dataByMethod[test.method]) {
-                      dataByMethod[test.method] = {};
-                    }
-                    dataByMethod[test.method][testKey] = test[metric];
-                  });
-                });
-                
-                const testNamesArray = Array.from(testNames);
-                const series = [];
-                
-                Array.from(methods).forEach(method => {
-                  const data = testNamesArray.map(testName => 
-                    dataByMethod[method][testName] !== undefined ? dataByMethod[method][testName] : null
-                  );
-                  
-                  series.push({
-                    name: method,
-                    type: 'bar',
-                    data: data,
-                    itemStyle: {
-                      color: methodColors[method] || '#95a5a6'
-                    }
-                  });
-                });
-                
-                const option = {
-                  tooltip: {
-                    trigger: 'axis',
-                    axisPointer: {
-                      type: 'shadow'
-                    }
-                  },
-                  legend: {
-                    data: Array.from(methods),
-                    textStyle: {
-                      color: '#eaeaea'
-                    },
-                    top: 10
-                  },
-                  grid: {
-                    left: '3%',
-                    right: '4%',
-                    bottom: '15%',
-                    top: '15%',
-                    containLabel: true
-                  },
-                  xAxis: {
-                    type: 'category',
-                    data: testNamesArray,
-                    axisLabel: {
-                      rotate: 45,
-                      color: '#eaeaea',
-                      interval: 0,
-                      fontSize: 10
-                    }
-                  },
-                  yAxis: {
-                    type: 'value',
-                    name: metric.toUpperCase() + ' (ms)',
-                    axisLabel: {
-                      color: '#eaeaea'
-                    },
-                    nameTextStyle: {
-                      color: '#eaeaea'
-                    }
-                  },
-                  series: series,
-                  dataZoom: [
-                    {
-                      type: 'slider',
-                      show: true,
-                      xAxisIndex: [0],
-                      start: 0,
-                      end: 100
-                    }
-                  ]
-                };
-                
-                chart.setOption(option);
-              }
-              
-              function getSourceCodeLink(benchmarkType, testName, method) {
-                const commit = benchmarkData.commit || 'main';
-                const baseUrl = 'https://github.com/KotoriK/js-benchmark/blob/' + commit;
-                
-                // Map benchmark types to files and line ranges
-                const fileMap = {
-                  'embind': 'wasm/benchmarks/benchmark_embind.mjs',
-                  'JSON': 'wasm/benchmarks/benchmark_json.mjs',
-                  'MessagePack': 'wasm/benchmarks/benchmark_msgpack.mjs',
-                  'typed-cstruct': 'wasm/benchmarks/benchmark_cstruct.mjs'
-                };
-                
-                const file = fileMap[benchmarkType];
-                if (!file) return null;
-                
-                // Line numbers are manually mapped to benchmark method calls
-                // Note: These may become outdated if source files are modified
-                // Consider updating these mappings when benchmark files change
-                let lineNumber = 1;
-                
-                // For embind, we have two methods: value_object and manual_val
-                if (benchmarkType === 'embind') {
-                  const isFirstMethod = (method === 'embind_value_object');
-                  if (testName.startsWith('flat_')) {
-                    lineNumber = isFirstMethod ? 43 : 51;
-                  } else if (testName.startsWith('nested_')) {
-                    lineNumber = isFirstMethod ? 67 : 73;
-                  } else if (testName.startsWith('numbers_')) {
-                    lineNumber = isFirstMethod ? 89 : 95;
-                  } else if (testName.startsWith('objects_')) {
-                    lineNumber = isFirstMethod ? 111 : 117;
-                  } else if (testName.startsWith('tree_')) {
-                    lineNumber = isFirstMethod ? 133 : 139;
-                  }
-                } else if (benchmarkType === 'JSON') {
-                  // JSON has only one method (json_memory_access)
-                  if (testName.startsWith('flat_')) {
-                    lineNumber = 43;
-                  } else if (testName.startsWith('nested_')) {
-                    lineNumber = 63;
-                  } else if (testName.startsWith('numbers_')) {
-                    lineNumber = 83;
-                  } else if (testName.startsWith('objects_')) {
-                    lineNumber = 103;
-                  } else if (testName.startsWith('tree_')) {
-                    lineNumber = 123;
-                  }
-                } else if (benchmarkType === 'MessagePack') {
-                  // MessagePack has only one method (msgpack_memory_access)
-                  if (testName.startsWith('flat_')) {
-                    lineNumber = 45;
-                  } else if (testName.startsWith('nested_')) {
-                    lineNumber = 67;
-                  } else if (testName.startsWith('numbers_')) {
-                    lineNumber = 89;
-                  } else if (testName.startsWith('objects_')) {
-                    lineNumber = 111;
-                  } else if (testName.startsWith('tree_')) {
-                    lineNumber = 133;
-                  }
-                } else if (benchmarkType === 'typed-cstruct') {
-                  // typed-cstruct has only one method
-                  if (testName.startsWith('flat_')) {
-                    lineNumber = 53;
-                  } else if (testName.startsWith('nested_')) {
-                    lineNumber = 90;
-                  } else if (testName.startsWith('numbers_')) {
-                    lineNumber = 134;
-                  } else if (testName.startsWith('objects_')) {
-                    lineNumber = 174;
-                  } else if (testName.startsWith('tree_')) {
-                    lineNumber = 241;
-                  }
-                }
-                
-                return baseUrl + '/' + file + '#L' + lineNumber;
-              }
-              
-              function renderTables(data) {
-                const container = document.getElementById('benchmarks');
-                container.innerHTML = '';
-                
-                data.benchmarks.forEach(benchmark => {
-                  const section = document.createElement('div');
-                  section.className = 'benchmark-section';
-                  
-                  const title = document.createElement('h3');
-                  title.textContent = benchmark.name;
-                  if (benchmark.benchmarkType) {
-                    title.textContent += ' - ' + benchmark.benchmarkType;
-                  }
-                  section.appendChild(title);
-                  
-                  // Group by method first (merge series by method)
-                  const byMethod = {};
-                  benchmark.tests.forEach(test => {
-                    if (!byMethod[test.method]) byMethod[test.method] = [];
-                    byMethod[test.method].push(test);
-                  });
-                  
-                  // Get all unique test names for columns
-                  const allTestNames = [...new Set(benchmark.tests.map(t => t.test))].sort();
-                  
-                  // Create a single comprehensive table grouped by method
-                  const tableContainer = document.createElement('div');
-                  tableContainer.className = 'table-container';
-                  
-                  const table = document.createElement('table');
-                  let tableHTML = `
-                    <thead>
-                      <tr>
-                        <th>Method</th>
-                        ${allTestNames.map(testName => `<th>${testName}</th>`).join('')}
-                      </tr>
-                    </thead>
-                    <tbody>
-                  `;
-                  
-                  // For each method, create a row with all test results
-                  Object.keys(byMethod).sort().forEach(method => {
-                    const tests = byMethod[method];
-                    const testMap = {};
-                    tests.forEach(t => testMap[t.test] = t);
-                    
-                    tableHTML += '<tr>';
-                    
-                    // Method name with source code link
-                    const firstTest = tests[0];
-                    const sourceLink = getSourceCodeLink(benchmark.benchmarkType, firstTest.test, method);
-                    if (sourceLink) {
-                      tableHTML += `<td><a href="${sourceLink}" target="_blank" style="color: #4ecdc4; text-decoration: none;">${method}</a></td>`;
-                    } else {
-                      tableHTML += `<td>${method}</td>`;
-                    }
-                    
-                    // Test results
-                    allTestNames.forEach(testName => {
-                      const test = testMap[testName];
-                      if (test) {
-                        // Find best (minimum) values across all methods for this test
-                        const allMethodsForTest = benchmark.tests.filter(t => t.test === testName);
-                        const bestAvg = Math.min(...allMethodsForTest.map(t => t.avg));
-                        
-                        const isBest = test.avg === bestAvg;
-                        const cellClass = isBest ? 'best-result' : '';
-                        tableHTML += `<td class="${cellClass}">${test.avg.toFixed(4)}</td>`;
-                      } else {
-                        tableHTML += '<td>-</td>';
-                      }
-                    });
-                    
-                    tableHTML += '</tr>';
-                  });
-                  
-                  tableHTML += '</tbody>';
-                  table.innerHTML = tableHTML;
-                  
-                  tableContainer.appendChild(table);
-                  section.appendChild(tableContainer);
-                  
-                  container.appendChild(section);
-                });
-              }
-              
-              function renderSystemInfo(sysInfo) {
-                const container = document.getElementById('systemInfo');
-                container.innerHTML = `
-                  <div class="system-info-item">
-                    <strong>Platform:</strong> ${sysInfo.platform} (${sysInfo.arch})
-                  </div>
-                  <div class="system-info-item">
-                    <strong>Node.js:</strong> ${sysInfo.nodeVersion}
-                  </div>
-                  <div class="system-info-item">
-                    <strong>CPU:</strong> ${sysInfo.cpuCores}x ${sysInfo.cpuModel}
-                  </div>
-                  <div class="system-info-item">
-                    <strong>Total Memory:</strong> ${sysInfo.totalMemoryGB} GB
-                  </div>
-                  <div class="system-info-item">
-                    <strong>Free Memory:</strong> ${sysInfo.freeMemoryGB} GB
-                  </div>
-                `;
-              }
-              
-              // Initialize chart
-              initChart();
-              
-              // Setup metric selector
-              document.querySelectorAll('.metric-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                  document.querySelectorAll('.metric-btn').forEach(b => b.classList.remove('active'));
-                  btn.classList.add('active');
-                  currentMetric = btn.dataset.metric;
-                  updateChart(currentMetric);
-                });
-              });
-              
-              // Setup test filter
-              document.getElementById('testFilter').addEventListener('change', (e) => {
-                currentFilter = e.target.value;
-                updateChart(currentMetric);
-              });
-              
-              // Load data
-              fetch('benchmark-results.json')
-                .then(res => res.json())
-                .then(data => {
-                  benchmarkData = data;
-                  
-                  // Populate filter dropdown with unique test categories
-                  const testCategories = new Set();
-                  data.benchmarks.forEach(benchmark => {
-                    testCategories.add(benchmark.name);
-                  });
-                  
-                  const filterSelect = document.getElementById('testFilter');
-                  Array.from(testCategories).sort().forEach(category => {
-                    const option = document.createElement('option');
-                    option.value = category;
-                    option.textContent = category;
-                    filterSelect.appendChild(option);
-                  });
-                  
-                  document.getElementById('timestamp').innerHTML = 
-                    '<strong>Run at:</strong> ' + new Date(data.timestamp).toLocaleString();
-                  document.getElementById('commit').innerHTML = 
-                    '<strong>Commit:</strong> ' + data.commit.substring(0, 8);
-                  document.getElementById('iterations').innerHTML = 
-                    '<strong>Iterations:</strong> ' + data.iterations + ' per benchmark';
-                  
-                  if (data.systemInfo) {
-                    renderSystemInfo(data.systemInfo);
-                  }
-                  
-                  renderTables(data);
-                  updateChart(currentMetric);
-                  
-                  document.getElementById('rawOutput').textContent = data.rawOutput;
-                })
-                .catch(err => {
-                  console.error('Failed to load results:', err);
-                  document.getElementById('benchmarks').innerHTML = 
-                    '<p>Failed to load benchmark results. Check console for details.</p>';
-                });
-              
-              // Handle window resize with throttling
-              // Note: No cleanup needed as this is a static page with single initialization
-              let resizeTimeout;
-              window.addEventListener('resize', () => {
-                clearTimeout(resizeTimeout);
-                resizeTimeout = setTimeout(() => {
-                  if (chart) chart.resize();
-                }, 200);
-              });
-            </script>
-          </body>
-          </html>
-          EOF
+        run: node .github/scripts/generate-pages.mjs
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -798,11 +167,16 @@ jobs:
         with:
           path: ./public
 
+  # ─────────────────────────────────────────────
+  # 5. Deploy to GitHub Pages
+  # ─────────────────────────────────────────────
   deploy:
-    needs: build-and-benchmark
+    needs: generate-pages
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    
+    if: >
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') &&
+      needs.generate-pages.result == 'success'
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

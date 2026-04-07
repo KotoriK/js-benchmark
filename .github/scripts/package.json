@@ -1,0 +1,9 @@
+{
+  "name": "benchmark-scripts",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "jsdom": "^24.1.1"
+  }
+}
