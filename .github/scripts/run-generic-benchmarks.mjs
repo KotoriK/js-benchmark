@@ -8,14 +8,12 @@
 
 import { execFileSync } from 'child_process';
 import { readdirSync, readFileSync, writeFileSync, unlinkSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { tmpdir } from 'os';
+import { scriptsDir, repoRoot, buildResultsObject } from './utils.mjs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(__dirname, '..', '..');
 const genericDir = join(repoRoot, 'generic');
-const captureConsole = join(__dirname, 'capture-console.cjs');
+const captureConsole = join(scriptsDir, 'capture-console.cjs');
 
 /** Maximum milliseconds to wait for a single benchmark script to complete. */
 const SCRIPT_TIMEOUT_MS = 180_000;
@@ -24,7 +22,7 @@ const scripts = readdirSync(genericDir)
     .filter(f => f.endsWith('.js'))
     .sort();
 
-console.log(`Found ${scripts.length} generic benchmark script(s): ${scripts.join(', ')}\n`);
+console.log(`Found ${scripts.length} generic benchmark scripts: ${scripts.join(', ')}\n`);
 
 const allResults = [];
 
@@ -68,13 +66,6 @@ for (const script of scripts) {
     }
 }
 
-const output = {
-    timestamp: new Date().toISOString(),
-    commit: process.env.GITHUB_SHA || 'local',
-    ref: process.env.GITHUB_REF || 'local',
-    benchmarks: allResults,
-};
-
 const outputPath = join(repoRoot, 'generic-results.json');
-writeFileSync(outputPath, JSON.stringify(output, null, 2));
+writeFileSync(outputPath, JSON.stringify(buildResultsObject(allResults), null, 2));
 console.log(`\nGeneric benchmark results saved to ${outputPath}`);

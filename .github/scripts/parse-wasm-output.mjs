@@ -10,11 +10,8 @@
  */
 
 import { readFileSync, writeFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const repoRoot = join(__dirname, '..', '..');
+import { join } from 'path';
+import { repoRoot, buildResultsObject } from './utils.mjs';
 
 const inputFile  = process.argv[2] || join(repoRoot, 'wasm', 'benchmark-output.txt');
 const outputFile = process.argv[3] || join(repoRoot, 'wasm-results.json');
@@ -60,14 +57,7 @@ if (sysInfoMatch) {
 // ---------------------------------------------------------------------------
 // Parse benchmark results
 // ---------------------------------------------------------------------------
-const results = {
-    timestamp:  new Date().toISOString(),
-    commit:     process.env.GITHUB_SHA || 'local',
-    ref:        process.env.GITHUB_REF || 'local',
-    iterations: parseInt(process.env.ITERATIONS || '200', 10),
-    systemInfo,
-    benchmarks: [],
-};
+const benchmarks = [];
 
 const lines = output.split('\n');
 let currentBenchmark    = null;
@@ -82,7 +72,7 @@ for (const line of lines) {
             benchmarkType: null,
             tests:         [],
         };
-        results.benchmarks.push(currentBenchmark);
+        benchmarks.push(currentBenchmark);
         inResults            = false;
         currentTestName      = 'unknown';
         currentBenchmarkType = null;
@@ -117,6 +107,12 @@ for (const line of lines) {
         }
     }
 }
+
+const results = {
+    ...buildResultsObject(benchmarks),
+    iterations: parseInt(process.env.ITERATIONS || '200', 10),
+    systemInfo,
+};
 
 writeFileSync(outputFile, JSON.stringify(results, null, 2));
 console.log(`WASM benchmark results saved to ${outputFile}`);

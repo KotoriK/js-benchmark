@@ -8,23 +8,21 @@
 
 import { createRequire } from 'module';
 import { readdirSync, readFileSync, writeFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 import { performance } from 'perf_hooks';
 import vm from 'vm';
+import { scriptsDir, repoRoot, buildResultsObject } from './utils.mjs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const _require = createRequire(import.meta.url);
 const { JSDOM } = _require('jsdom');
 
-const repoRoot = join(__dirname, '..', '..');
 const domDir = join(repoRoot, 'dom');
 
 const scripts = readdirSync(domDir)
     .filter(f => f.endsWith('.js'))
     .sort();
 
-console.log(`Found ${scripts.length} DOM benchmark script(s): ${scripts.join(', ')}\n`);
+console.log(`Found ${scripts.length} DOM benchmark scripts: ${scripts.join(', ')}\n`);
 
 const allResults = [];
 
@@ -90,13 +88,6 @@ for (const script of scripts) {
     }
 }
 
-const output = {
-    timestamp: new Date().toISOString(),
-    commit: process.env.GITHUB_SHA || 'local',
-    ref: process.env.GITHUB_REF || 'local',
-    benchmarks: allResults,
-};
-
 const outputPath = join(repoRoot, 'dom-results.json');
-writeFileSync(outputPath, JSON.stringify(output, null, 2));
+writeFileSync(outputPath, JSON.stringify(buildResultsObject(allResults), null, 2));
 console.log(`\nDOM benchmark results saved to ${outputPath}`);
