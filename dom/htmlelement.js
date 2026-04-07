@@ -3,57 +3,68 @@
  *
  * @author KotoriK
  */
-function startTest(testUrl) {
-    fetch(testUrl, {
-            method: 'get'
-        })
-        .then(async (response) => {
-            return URL.createObjectURL(await response.blob())
-        }).then((url) => {
-            var array = []
-            console.time('create')
-            create(array, 5000)
-            console.timeEnd('create')
-            console.time('modify')
-            modify(array, url)
-            console.timeEnd('modify')
-            let array2 = [...array]
-            console.time('deleteGC')
+const performance = globalThis.performance;
 
-            deleteGC(array)
-            console.timeEnd('deleteGC')
-
-            console.time('deleteNull')
-            deleteNull(array2)
-            console.timeEnd('deleteNull')
-        })
-
-}
-
-
-
+const ELEMENT_COUNT = 1000;
 
 function create(array, eleNum) {
     for (let i = 0; i < eleNum; i++) {
-        array.push(document.createElement('audio'))
-
+        array.push(document.createElement('audio'));
     }
 }
 
 function modify(array, url) {
-    for (const i of array) {
-        i.src = url
+    for (const el of array) {
+        el.src = url;
     }
 }
 
 function deleteGC(array) {
     while (array.length > 0) {
-        array.shift()
+        array.shift();
     }
 }
 
 function deleteNull(array) {
     for (let i = 0; i < array.length; i++) {
-        array[i] = null
+        array[i] = null;
     }
 }
+
+function run() {
+    var array = [];
+
+    performance.mark('start');
+    create(array, ELEMENT_COUNT);
+    performance.mark('end');
+    performance.measure('create', 'start', 'end');
+    performance.clearMarks();
+
+    performance.mark('start');
+    modify(array, 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=');
+    performance.mark('end');
+    performance.measure('modify', 'start', 'end');
+    performance.clearMarks();
+
+    var array2 = [...array];
+
+    performance.mark('start');
+    deleteGC(array);
+    performance.mark('end');
+    performance.measure('deleteGC', 'start', 'end');
+    performance.clearMarks();
+
+    performance.mark('start');
+    deleteNull(array2);
+    performance.mark('end');
+    performance.measure('deleteNull', 'start', 'end');
+    performance.clearMarks();
+
+    const measures = performance.getEntriesByType('measure');
+    performance.clearMeasures();
+    console.group(`HTMLElement Benchmark (${ELEMENT_COUNT} elements)`);
+    console.table(measures.map(({ name, duration }) => ({ name, duration })));
+    console.groupEnd();
+}
+
+run();
