@@ -54,6 +54,16 @@ function boolTernary(testCase) {
     return result;
 }
 
+function boolTernary2(testCase) {
+    performance.mark('start');
+    let result = 0;
+    for (let i = 0; i < testCase.length; i++) {
+        result = testCase[i] === true ? 1 : 0;
+    }
+    performance.mark('end');
+    return result;
+}
+
 // --- String coercion ---
 
 function strBitwiseOr(testCase) {
@@ -130,6 +140,7 @@ function runBoolean() {
     measure('+x', boolUnaryPlus, booleans);
     measure('Number(x)', boolNumberConstructor, booleans);
     measure('x ? 1 : 0', boolTernary, booleans);
+    measure('x === true ? 1 : 0', boolTernary2, booleans);
 
     const measures = performance.getEntriesByType('measure');
     performance.clearMeasures();
