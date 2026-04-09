@@ -122,6 +122,7 @@ export function getSystemInfo() {
         arch: process.arch,
         nodeVersion: process.version,
         cpuModel: cpus[0]?.model || 'Unknown',
+        cpuSpeed: cpus[0]?.speed || 0,
         cpuCores: cpus.length,
         totalMemoryGB: (os.totalmem() / 1024 / 1024 / 1024).toFixed(2),
         freeMemoryGB: (os.freemem() / 1024 / 1024 / 1024).toFixed(2)

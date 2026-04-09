@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── custom scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #1a1a2e; }
+::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #e94560; }
+
+/* ── table ────────────────────────────────────────────── */
+.bm-table {
+  @apply w-full border-collapse mt-4;
+}
+.bm-table th {
+  @apply px-3 py-2 text-left bg-accent text-white sticky top-0 text-sm;
+}
+.bm-table td {
+  @apply px-3 py-2 text-sm border-b border-accent;
+}
+.bm-table tr:hover td {
+  background: rgba(233, 69, 96, 0.08);
+}
+.best-result {
+  @apply font-bold text-teal;
+}
+
+/* ── misc ─────────────────────────────────────────────── */
+.error-badge {
+  @apply inline-block bg-highlight text-white text-xs rounded px-2 py-0.5 ml-2;
+}

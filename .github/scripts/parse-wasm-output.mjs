@@ -26,6 +26,7 @@ let systemInfo = {
     arch: 'unknown',
     nodeVersion: 'unknown',
     cpuModel: 'unknown',
+    cpuSpeed: 0,
     cpuCores: 0,
     totalMemoryGB: '0',
     freeMemoryGB: '0',
@@ -36,7 +37,7 @@ if (sysInfoMatch) {
     const sysText = sysInfoMatch[0];
     const platformMatch = sysText.match(/Platform:\s*([^(]+)\(([^)]+)\)/);
     const nodeMatch     = sysText.match(/Node\.js:\s*([^\n]+)/);
-    const cpuMatch      = sysText.match(/CPU:\s*(\d+)x\s*([^\n]+)/);
+    const cpuMatch      = sysText.match(/CPU:\s*(\d+)x\s*([^@\n]+?)(?:\s*@\s*([\d.]+)\s*MHz)?(?:\n|$)/);
     const memMatch      = sysText.match(/Memory:\s*([\d.]+)\s*GB total,\s*([\d.]+)\s*GB free/);
 
     if (platformMatch) {
@@ -47,6 +48,7 @@ if (sysInfoMatch) {
     if (cpuMatch) {
         systemInfo.cpuCores = parseInt(cpuMatch[1], 10);
         systemInfo.cpuModel = cpuMatch[2].trim();
+        systemInfo.cpuSpeed = cpuMatch[3] ? parseFloat(cpuMatch[3]) : 0;
     }
     if (memMatch) {
         systemInfo.totalMemoryGB = memMatch[1];
