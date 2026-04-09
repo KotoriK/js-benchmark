@@ -202,7 +202,7 @@ function renderSimpleCategory(categoryId, category) {
       allMethods.forEach(method => {
         const m = g.measurements.find(x => x.name === method);
         if (m) {
-          const isBest = Math.abs((m.duration ?? 0) - bestDur) < 1e-9;
+          const isBest = Math.abs((m.duration ?? 0) - bestDur) < 0.0001;
           html += `<td class="${isBest ? 'best-result' : ''}">${(m.duration ?? 0).toFixed(4)}</td>`;
         } else {
           html += '<td>–</td>';
@@ -295,7 +295,7 @@ function renderWasmCategory(categoryId, category) {
         const t = map[testName];
         if (t) {
           const best = Math.min(...bench.tests.filter(x => x.test === testName).map(x => x.avg));
-          html += `<td class="${Math.abs(t.avg - best) < 1e-9 ? 'best-result' : ''}">${t.avg.toFixed(4)}</td>`;
+          html += `<td class="${Math.abs(t.avg - best) < 0.0001 ? 'best-result' : ''}">${t.avg.toFixed(4)}</td>`;
         } else {
           html += '<td>–</td>';
         }
