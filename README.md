@@ -1,0 +1,35 @@
+# js-benchmark
+
+一组 JavaScript 性能基准测试，涵盖通用 JS、DOM 操作和 WebAssembly 数据传输场景。测试结果通过 GitHub Actions 自动运行，并部署到 GitHub Pages 供查看。
+
+**📊 测试结果：<https://KotoriK.github.io/js-benchmark/>**
+
+## 测试分类
+
+### Generic（通用 JS）
+纯 JavaScript 运行时性能对比，包括：
+- **array-clone** — 数组克隆方式（`slice` / `Array.from` / `map` / 展开运算符 / `push`）
+- **array-set** — `Array` 与 `Set` 的增删查性能
+- **coerce-to-number** — 各种数值强制转换方式
+- **number-trunc** — 去除小数部分的方法（`Math.trunc` / `Math.floor` / `x | 0` / `~~x`）
+
+### DOM
+基于 jsdom 的 DOM 操作性能，包括：
+- **htmlelement** — 批量创建、修改属性、删除 HTMLElement 的耗时对比
+
+### WASM（WebAssembly）
+测试从 C++（WASM）向 JavaScript 传输复杂对象数据的各种方式：
+- embind（value_object）
+- embind（manual val）
+- JSON（yyjson + 内存直接访问）
+- MessagePack（msgpack-c + HEAPU8 内存访问）
+- typed-cstruct（原始 C 结构体 + 内存直接访问）
+
+详见 [wasm/README.md](wasm/README.md)。
+
+## CI / 自动化
+
+推送到 `main` / `master` 分支时，GitHub Actions 会自动：
+1. 运行三类基准测试
+2. 汇总结果并生成可视化报告
+3. 将报告部署到 GitHub Pages
