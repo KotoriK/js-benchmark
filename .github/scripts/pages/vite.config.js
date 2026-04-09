@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  base: './',
   build: {
     outDir: 'dist',
     // ECharts tree-shaken bundle is ~520 kB minified – silence the warning
