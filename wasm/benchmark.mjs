@@ -35,7 +35,7 @@ async function main() {
     console.log('System Information:');
     console.log(`  Platform: ${sysInfo.platform} (${sysInfo.arch})`);
     console.log(`  Node.js: ${sysInfo.nodeVersion}`);
-    console.log(`  CPU: ${sysInfo.cpuCores}x ${sysInfo.cpuModel}`);
+    console.log(`  CPU: ${sysInfo.cpuCores}x ${sysInfo.cpuModel} @ ${sysInfo.cpuSpeed} MHz`);
     console.log(`  Memory: ${sysInfo.totalMemoryGB} GB total, ${sysInfo.freeMemoryGB} GB free\n`);
 
     console.log('Loading WebAssembly modules...\n');

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-bg text-[#eaeaea]">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JS Benchmark Results</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body class="min-h-screen p-5 leading-relaxed">
+
+<div class="max-w-7xl mx-auto">
+
+  <h1 class="text-highlight border-b-2 border-highlight pb-2.5 text-3xl font-bold mb-5">
+    🚀 JS Benchmark Results
+  </h1>
+
+  <!-- Run info -->
+  <div class="bg-card p-4 rounded-lg mb-5" id="infoBox">
+    <p id="timestamp"></p>
+    <p id="commit"></p>
+  </div>
+
+  <!-- System info -->
+  <h2 class="text-[#eaeaea] mt-7 mb-3 text-xl font-semibold">💻 System Information</h2>
+  <div class="bg-card p-4 rounded-lg mb-5 grid gap-2.5" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr))"
+       id="systemInfo">
+    <em class="text-muted">No system information available.</em>
+  </div>
+
+  <!-- Results -->
+  <h2 class="text-[#eaeaea] mt-7 mb-3 text-xl font-semibold">📊 Results</h2>
+  <div class="flex gap-2 flex-wrap mb-6" id="categoryTabs"></div>
+  <div id="categoryContent"></div>
+
+</div>
+
+<!-- Floating TOC -->
+<div id="tocContainer" class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+  <div id="tocPanel"
+       class="hidden bg-card border border-accent rounded-xl shadow-2xl p-4 w-64 max-h-80 overflow-y-auto">
+    <p class="text-teal font-semibold text-sm mb-2">Benchmarks</p>
+    <ul id="tocList" class="space-y-1 text-sm"></ul>
+  </div>
+  <button id="tocBtn"
+          class="w-12 h-12 bg-highlight hover:bg-[#c73652] text-white rounded-full shadow-lg flex items-center justify-center text-xl transition-colors select-none"
+          title="Table of Contents" aria-label="Toggle table of contents">
+    ☰
+  </button>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
