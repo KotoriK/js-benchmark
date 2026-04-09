@@ -1,6 +1,6 @@
 # js-benchmark
 
-一组 JavaScript 性能基准测试，涵盖通用 JS、DOM 操作和 WebAssembly 数据传输场景。测试结果通过 GitHub Actions 自动运行，并部署到 GitHub Pages 供查看。
+一组 JavaScript 性能基准测试，涵盖通用 JS、DOM 操作和 WebAssembly 数据传输场景。
 
 **📊 测试结果：<https://KotoriK.github.io/js-benchmark/>**
 
@@ -26,10 +26,3 @@
 - typed-cstruct（原始 C 结构体 + 内存直接访问）
 
 详见 [wasm/README.md](wasm/README.md)。
-
-## CI / 自动化
-
-推送到 `main` / `master` 分支时，GitHub Actions 会自动：
-1. 运行三类基准测试
-2. 汇总结果并生成可视化报告
-3. 将报告部署到 GitHub Pages
