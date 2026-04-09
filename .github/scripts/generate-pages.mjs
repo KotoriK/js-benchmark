@@ -9,15 +9,14 @@
  *
  * Writes to ./public/:
  *   benchmark-data.json  – merged results consumed by index.html
- *   index.html + assets  – built by Vite (pages/dist/), or falls back to
- *                          index-template.html for local development
+ *   index.html + assets  – copied from pages/dist/ (built by Vite)
  */
 
-import { readFileSync, writeFileSync, mkdirSync, rmSync, existsSync, cpSync } from 'fs';
+import { writeFileSync, mkdirSync, rmSync, existsSync, cpSync } from 'fs';
 import { join } from 'path';
-import { scriptsDir, repoRoot, tryReadJson, buildSystemInfo } from './utils.mjs';
+import { scriptsDir, repoRoot, tryReadJson } from './utils.mjs';
 
-const publicDir   = join(repoRoot, 'public');
+const publicDir    = join(repoRoot, 'public');
 const pagesDistDir = join(scriptsDir, 'pages', 'dist');
 
 const genericResults = tryReadJson(join(repoRoot, 'generic-results.json'));
@@ -29,16 +28,20 @@ if (!genericResults && !domResults && !wasmResults) {
     process.exit(1);
 }
 
+if (!existsSync(pagesDistDir)) {
+    console.error('Error: pages/dist not found. Run "pnpm build" in .github/scripts/pages/ first.');
+    process.exit(1);
+}
+
 // ---------------------------------------------------------------------------
 // Build unified data object
 // ---------------------------------------------------------------------------
 
-// Prefer WASM systemInfo (most complete), then generic/dom, then local
 const systemInfo =
     wasmResults?.systemInfo    ||
     genericResults?.systemInfo ||
     domResults?.systemInfo     ||
-    buildSystemInfo();
+    null;
 
 const repoEnv = process.env.GITHUB_REPOSITORY;
 const repoUrl = repoEnv ? `https://github.com/${repoEnv}` : null;
@@ -92,14 +95,7 @@ writeFileSync(
 );
 console.log('Written: public/benchmark-data.json');
 
-// Copy built Vite assets (preferred) or fall back to the legacy template
-if (existsSync(pagesDistDir)) {
-    cpSync(pagesDistDir, publicDir, { recursive: true });
-    console.log('Copied: pages/dist → public/');
-} else {
-    const templatePath = join(scriptsDir, 'index-template.html');
-    writeFileSync(join(publicDir, 'index.html'), readFileSync(templatePath, 'utf8'));
-    console.log('Written: public/index.html (legacy template – run pages build for production)');
-}
+cpSync(pagesDistDir, publicDir, { recursive: true });
+console.log('Copied: pages/dist → public/');
 
 console.log('\nGitHub Pages content generated in ./public/');
