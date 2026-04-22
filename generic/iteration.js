@@ -1,6 +1,6 @@
 const performance = globalThis.performance ?? require('perf_hooks').performance;
 
-const ITEM_COUNT = 100_000;
+const SIZES = [10, 1_000, 100_000];
 
 function measure(measurementName, fn) {
     performance.mark('start');
@@ -13,23 +13,23 @@ function measure(measurementName, fn) {
     performance.clearMarks();
 }
 
-function buildArray() {
-    return Array.from({ length: ITEM_COUNT }, (_, i) => i);
+function buildArray(n) {
+    return Array.from({ length: n }, (_, i) => i);
 }
 
-function buildObject() {
+function buildObject(n) {
     const obj = Object.create(null);
-    for (let i = 0; i < ITEM_COUNT; i++) obj[i] = i;
+    for (let i = 0; i < n; i++) obj[i] = i;
     return obj;
 }
 
-function buildSet() {
-    return new Set(buildArray());
+function buildSet(n) {
+    return new Set(buildArray(n));
 }
 
-function buildMap() {
+function buildMap(n) {
     const map = new Map();
-    for (let i = 0; i < ITEM_COUNT; i++) map.set(i, i);
+    for (let i = 0; i < n; i++) map.set(i, i);
     return map;
 }
 
@@ -121,48 +121,50 @@ function iterateMapKeysGet(testCase) {
     return sum;
 }
 
-function printMeasures(label) {
+function printMeasures(label, n) {
     const measures = performance.getEntriesByType('measure');
     performance.clearMeasures();
-    console.group(`${label} iteration (${ITEM_COUNT.toLocaleString()} items)`);
+    console.group(`${label} iteration (${n.toLocaleString()} items)`);
     console.table(measures.map(({ name, duration }) => ({ name, duration })));
     console.groupEnd();
 }
 
-function runArray() {
-    const testCase = buildArray();
+function runArray(n) {
+    const testCase = buildArray(n);
     measure('for (index)', () => iterateArrayForIndex(testCase));
     measure('for...of', () => iterateArrayForOf(testCase));
     measure('forEach', () => iterateArrayForEach(testCase));
     measure('while', () => iterateArrayWhile(testCase));
-    printMeasures('Array');
+    printMeasures('Array', n);
 }
 
-function runObject() {
-    const testCase = buildObject();
+function runObject(n) {
+    const testCase = buildObject(n);
     measure('Object.keys + for', () => iterateObjectKeysFor(testCase));
     measure('for...in', () => iterateObjectForIn(testCase));
     measure('Object.entries + for...of', () => iterateObjectEntriesForOf(testCase));
-    printMeasures('Object');
+    printMeasures('Object', n);
 }
 
-function runSet() {
-    const testCase = buildSet();
+function runSet(n) {
+    const testCase = buildSet(n);
     measure('for...of', () => iterateSetForOf(testCase));
     measure('forEach', () => iterateSetForEach(testCase));
     measure('iterator.next()', () => iterateSetIterator(testCase));
-    printMeasures('Set');
+    printMeasures('Set', n);
 }
 
-function runMap() {
-    const testCase = buildMap();
+function runMap(n) {
+    const testCase = buildMap(n);
     measure('for...of entries', () => iterateMapForOf(testCase));
     measure('forEach', () => iterateMapForEach(testCase));
     measure('keys() + get()', () => iterateMapKeysGet(testCase));
-    printMeasures('Map');
+    printMeasures('Map', n);
 }
 
-runArray();
-runObject();
-runSet();
-runMap();
+for (const n of SIZES) {
+    runArray(n);
+    runObject(n);
+    runSet(n);
+    runMap(n);
+}
