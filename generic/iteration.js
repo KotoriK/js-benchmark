@@ -2,9 +2,9 @@ const performance = globalThis.performance ?? require('perf_hooks').performance;
 
 const ITEM_COUNT = 100_000;
 
-function measure(label, fn) {
+function measure(measurementName, fn) {
     fn();
-    performance.measure(label, 'start', 'end');
+    performance.measure(measurementName, 'start', 'end');
     performance.clearMarks();
 }
 
