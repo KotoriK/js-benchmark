@@ -10,6 +10,7 @@
 纯 JavaScript 运行时性能对比，包括：
 - **array-clone** — 数组克隆方式（`slice` / `Array.from` / `map` / 展开运算符 / `push`）
 - **array-set** — `Array` 与 `Set` 的增删查性能
+- **iteration** — `Array` / `Object` / `Set` / `Map` 的多种遍历方式性能对比
 - **coerce-to-number** — 各种数值强制转换方式
 - **number-trunc** — 去除小数部分的方法（`Math.trunc` / `Math.floor` / `x | 0` / `~~x`）
 
