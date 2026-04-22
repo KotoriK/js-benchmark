@@ -3,7 +3,12 @@ const performance = globalThis.performance ?? require('perf_hooks').performance;
 const ITEM_COUNT = 100_000;
 
 function measure(measurementName, fn) {
-    fn();
+    performance.mark('start');
+    try {
+        fn();
+    } finally {
+        performance.mark('end');
+    }
     performance.measure(measurementName, 'start', 'end');
     performance.clearMarks();
 }
@@ -23,88 +28,71 @@ function buildSet() {
 }
 
 function buildMap() {
-    return new Map(buildArray().map(i => [i, i]));
+    const map = new Map();
+    for (let i = 0; i < ITEM_COUNT; i++) map.set(i, i);
+    return map;
 }
 
 function iterateArrayForIndex(testCase) {
-    performance.mark('start');
     let sum = 0;
     for (let i = 0; i < testCase.length; i++) sum += testCase[i];
-    performance.mark('end');
     return sum;
 }
 
 function iterateArrayForOf(testCase) {
-    performance.mark('start');
     let sum = 0;
     for (const value of testCase) sum += value;
-    performance.mark('end');
     return sum;
 }
 
 function iterateArrayForEach(testCase) {
-    performance.mark('start');
     let sum = 0;
     testCase.forEach(value => { sum += value; });
-    performance.mark('end');
     return sum;
 }
 
 function iterateArrayWhile(testCase) {
-    performance.mark('start');
     let sum = 0;
     let i = 0;
     while (i < testCase.length) {
         sum += testCase[i];
         i++;
     }
-    performance.mark('end');
     return sum;
 }
 
 function iterateObjectKeysFor(testCase) {
-    performance.mark('start');
     let sum = 0;
     const keys = Object.keys(testCase);
     for (let i = 0; i < keys.length; i++) sum += testCase[keys[i]];
-    performance.mark('end');
     return sum;
 }
 
 function iterateObjectForIn(testCase) {
-    performance.mark('start');
     let sum = 0;
     for (const key in testCase) sum += testCase[key];
-    performance.mark('end');
     return sum;
 }
 
 function iterateObjectEntriesForOf(testCase) {
-    performance.mark('start');
     let sum = 0;
     for (const [, value] of Object.entries(testCase)) sum += value;
-    performance.mark('end');
     return sum;
 }
 
 function iterateSetForOf(testCase) {
-    performance.mark('start');
     let sum = 0;
     for (const value of testCase) sum += value;
-    performance.mark('end');
     return sum;
 }
 
 function iterateSetForEach(testCase) {
-    performance.mark('start');
     let sum = 0;
     testCase.forEach(value => { sum += value; });
-    performance.mark('end');
     return sum;
 }
 
 function iterateSetIterator(testCase) {
-    performance.mark('start');
     let sum = 0;
     const iterator = testCase.values();
     let entry = iterator.next();
@@ -112,31 +100,24 @@ function iterateSetIterator(testCase) {
         sum += entry.value;
         entry = iterator.next();
     }
-    performance.mark('end');
     return sum;
 }
 
 function iterateMapForOf(testCase) {
-    performance.mark('start');
     let sum = 0;
     for (const [, value] of testCase) sum += value;
-    performance.mark('end');
     return sum;
 }
 
 function iterateMapForEach(testCase) {
-    performance.mark('start');
     let sum = 0;
     testCase.forEach(value => { sum += value; });
-    performance.mark('end');
     return sum;
 }
 
 function iterateMapKeysGet(testCase) {
-    performance.mark('start');
     let sum = 0;
     for (const key of testCase.keys()) sum += testCase.get(key);
-    performance.mark('end');
     return sum;
 }
 
