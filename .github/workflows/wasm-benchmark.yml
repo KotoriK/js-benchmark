@@ -42,7 +42,7 @@ jobs:
           path: generic-results.json
 
   # ─────────────────────────────────────────────
-  # 2. DOM benchmarks (jsdom)
+  # 2. DOM benchmarks (Chromium)
   # ─────────────────────────────────────────────
   benchmark-dom:
     runs-on: ubuntu-latest
@@ -64,6 +64,10 @@ jobs:
       - name: Install script dependencies
         working-directory: .github/scripts
         run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        working-directory: .github/scripts
+        run: pnpm exec playwright install --with-deps chromium
 
       - name: Run DOM benchmarks
         run: node .github/scripts/run-dom-benchmarks.mjs

@@ -15,8 +15,9 @@
 - **number-trunc** — 去除小数部分的方法（`Math.trunc` / `Math.floor` / `x | 0` / `~~x`）
 
 ### DOM
-基于 jsdom 的 DOM 操作性能，包括：
-- **htmlelement** — 批量创建、修改属性、删除 HTMLElement 的耗时对比
+在 Chromium 浏览器环境中运行的 DOM 操作性能测试，包括：
+- **htmlelement** — 批量创建 AudioElement、修改其属性以及清理引用的耗时对比
+- **nested-list** — 在不同列表长度和嵌套深度下，逐个创建元素、使用 `innerHTML`、使用 `DocumentFragment` 构建多级列表的耗时对比
 
 ### WASM（WebAssembly）
 测试从 C++（WASM）向 JavaScript 传输复杂对象数据的各种方式：

@@ -1,20 +1,15 @@
 /**
- * Discovers and runs all *.js benchmark scripts in the dom/ directory using
- * jsdom to simulate a browser environment.  Each script's console.group /
- * console.table output is captured as structured JSON.
+ * Discovers and runs all *.js benchmark scripts in the dom/ directory in
+ * headless Chromium. Each script's console.group / console.table output is
+ * captured as structured JSON.
  *
  * Output: dom-results.json in the repository root.
  */
 
-import { createRequire } from 'module';
 import { readdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { performance } from 'perf_hooks';
-import vm from 'vm';
-import { scriptsDir, repoRoot, buildResultsObject } from './utils.mjs';
-
-const _require = createRequire(import.meta.url);
-const { JSDOM } = _require('jsdom');
+import { chromium } from 'playwright';
+import { repoRoot, buildResultsObject } from './utils.mjs';
 
 const domDir = join(repoRoot, 'dom');
 
@@ -24,68 +19,54 @@ const scripts = readdirSync(domDir)
 
 console.log(`Found ${scripts.length} DOM benchmark scripts: ${scripts.join(', ')}\n`);
 
+const browser = await chromium.launch({ headless: true });
 const allResults = [];
 
-for (const script of scripts) {
-    console.log(`Running ${script}...`);
+try {
+    for (const script of scripts) {
+        console.log(`Running ${script}...`);
 
-    const code = readFileSync(join(domDir, script), 'utf8');
-    const groups = [];
-    let currentGroup = null;
+        const code = readFileSync(join(domDir, script), 'utf8');
+        const page = await browser.newPage();
 
-    try {
-        const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>', {
-            url: 'http://localhost/',
-            runScripts: 'dangerously',
-        });
+        try {
+            await page.setContent('<!DOCTYPE html><html><body></body></html>');
+            await page.evaluate(() => {
+                const groups = [];
+                let currentGroup = null;
 
-        const { window } = dom;
+                window.console.group = label => {
+                    currentGroup = { label: String(label ?? ''), measurements: [] };
+                    groups.push(currentGroup);
+                };
+                window.console.table = data => {
+                    if (currentGroup && Array.isArray(data)) {
+                        currentGroup.measurements.push(...data);
+                    }
+                };
+                window.console.groupEnd = () => {
+                    currentGroup = null;
+                };
+                window.__benchmarkGroups = groups;
+            });
 
-        // Obtain the raw VM context used by jsdom and inject the Node.js
-        // performance API directly so benchmark scripts can call
-        // performance.mark / measure / getEntriesByType.
-        const vmContext = dom.getInternalVMContext();
-        Object.defineProperty(vmContext, 'performance', {
-            value: performance,
-            writable: true,
-            configurable: true,
-        });
-
-        // Patch console methods to capture benchmark results
-        const capturedConsole = {
-            group(label) {
-                currentGroup = { label: String(label ?? ''), measurements: [] };
-                groups.push(currentGroup);
-                console.log(`  Group: ${label}`);
-            },
-            table(data) {
-                if (currentGroup && Array.isArray(data)) {
-                    currentGroup.measurements.push(...data);
-                }
-            },
-            groupEnd() {
-                currentGroup = null;
-            },
-            // Pass through other console methods to avoid script errors
-            log: console.log.bind(console),
-            warn: console.warn.bind(console),
-            error: console.error.bind(console),
-        };
-        vmContext.console = capturedConsole;
-
-        // Execute the benchmark script in the jsdom VM context
-        vm.runInContext(code, vmContext, { filename: script });
-
-        allResults.push({ file: script, name: script.replace(/\.js$/, ''), groups });
-    } catch (err) {
-        console.error(`  Error running ${script}: ${err.message}`);
-        allResults.push({
-            file: script,
-            name: script.replace(/\.js$/, ''),
-            groups: [],
-            error: err.message,
-        });
+            await page.addScriptTag({ content: code });
+            const groups = await page.evaluate(() => window.__benchmarkGroups);
+            allResults.push({ file: script, name: script.replace(/\.js$/, ''), groups });
+        } catch (err) {
+            console.error(`  Error running ${script}: ${err.message}`);
+            allResults.push({
+                file: script,
+                name: script.replace(/\.js$/, ''),
+                groups: [],
+                error: err.message,
+            });
+        } finally {
+            await page.close();
+        }
     }
+} finally {
+    await browser.close();
 }
 
 const outputPath = join(repoRoot, 'dom-results.json');
